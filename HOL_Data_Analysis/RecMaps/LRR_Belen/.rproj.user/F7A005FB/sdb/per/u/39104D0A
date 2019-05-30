@@ -1,0 +1,21 @@
+{
+    "collab_server" : "",
+    "contents" : "library(MASS)\n# draw the distance to the optimum \nmyDist=rexp(n = 1,rate = 1/2)\n\nz0=c(myDist,0)\nz0[1]\nz0[2]\nplot(NULL, xlim=c(-5,5), ylim=c(-5,5), xlab=\"Z1\", ylab=\"Z2\")\npoints(z0[1],z0[2], col=\"blue\", pch=20)\nMut_sigma=0.2\nSigmaM=Mut_sigma * diag(2)\nNew_Muts=mvrnorm(n = 5,mu = c(0,0),Sigma =SigmaM )\n\nZ1Muts=z0[1]+New_Muts[,1]\nZ2Muts=z0[1]+New_Muts[,2]\npoints(Z1Muts,Z2Muts, col=\"red\", pch=21)\n\n",
+    "created" : 1538644995105.000,
+    "dirty" : true,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "3682461630",
+    "id" : "39104D0A",
+    "lastKnownWriteTime" : 0,
+    "last_content_update" : 1538647701253,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
