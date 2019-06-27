@@ -88,7 +88,7 @@ colrs[setdiff(SigSDS2,SigSDS)] <- "blue"
 
 png(paste0('OutFigures/SDS_Chr_All_AbsVal_',fname,'N0.png'),width=4*(1+sqrt(5)),height=8,units = 'in',res=200)
 par(mar=c(5,8,4,2) + 0.1)
-plot(SDSres[,13],col=colrs,pch=16, xaxt="n", yaxt="n", xlab="Chromosome",ylab="",main=substitute(bold(paste("Absolute Standardised SDS for all ",bolditalic('Bos taurus')," Chromosomes"))),ylim=c(0,8))
+plot(SDSres[,13],col=colrs,pch=16, xaxt="n", yaxt="n", xlab="Chromosome",ylab="",main=substitute(bold(paste("Absolute Standardised SDS for ",bolditalic('Bos taurus')," Autosomes"))),ylim=c(0,8))
 axis(1, at=tickpos, labels=cno)
 axis(2, at=seq(0,8,2), las=2)
 text(x=-275000,y=4,labels=paste("Absolute","Standardised","SDS",sep="\n"),xpd=NA)
@@ -114,7 +114,7 @@ sigmilk		# Milk genes overlapping with highly-significant SDS regions
 SigSDSRes2[row.names(SigSDSRes2)%in%sigmilk,]
 
 # Print BED file of significant regions for bedtools analysis
-space <- 50000		# How much space to add either side (to look for nearby genes as well)
+space <- 10000		# How much space to add either side (to look for nearby genes as well)
 sigbed <- cbind(as.numeric(unlist(strsplit(as.character(SigSDSRes$CHROMOSOME),"r"))[seq(2,2*dim(SigSDSRes)[1],2)]),SigSDSRes$POS-space,SigSDSRes$POS+space)
 # Merging overlapping windows
 for(i in cno){
