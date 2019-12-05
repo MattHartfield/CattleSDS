@@ -100,7 +100,7 @@ dev.off()
 ## Part 2: Are any high SDS scores within milk-producing regions?
 # Reading in and classifying milk-producing regions
 # From milk-protein gene set (additional data file 2 from Lemay et al 2009 Genome Biology)
-milky <- read.table("milk_protein_gene_set_Lemay_2009.bed",skip=1)[,1:3] # Only including gene locations and autosomal genes
+milky <- read.table("Milk_Protein_Genes_Sept19/milk_protein_names_conv_Sept19.bed",skip=1)[,1:3] # Only including gene locations and autosomal genes
 names(milky) <- c("chrom","chromStart","chromEnd")
 milky$chrom <- factor(milky$chrom, levels=unique(SDSres$CHROMOSOME))
 sigmilk <- vector(mode="numeric",length=0)
@@ -194,30 +194,31 @@ dev.off()
 
 # Now loading in recombination data for use in model comparison
 # Loading in recmap data
-recmaps <- read.csv("RecMaps/LRR_Belen/local_recomb_rate_per_bin_NEW.txt",head=F)
-colnames(recmaps) <- c("chr","bin","begin","end","mid", "cMperMb")
-recmaps <- recmaps[!is.na(recmaps$cMperMb),]	# excluding bins with no LRR estimated
+# Commented out - not using for now (based on old assembly)
+# recmaps <- read.csv("RecMaps/LRR_Belen/local_recomb_rate_per_bin_NEW.txt",head=F)
+# colnames(recmaps) <- c("chr","bin","begin","end","mid", "cMperMb")
+# recmaps <- recmaps[!is.na(recmaps$cMperMb),]	# excluding bins with no LRR estimated
 
 # For each chromosome:
 # (1) Predict local rec rate using cubic formulae
 # (2) Use these to fill in rec rates
-for(i in unique(cno)){
-	rmc <- subset(recmaps,chr==i)
-	mfit <- lm(cMperMb ~ mid + I(mid^2) + I(mid^3),data=rmc)
-	prec <- predict(mfit,list(mid=subset(SDSres2,CHROMOSOME==paste0("Chr",i))$POS))
-	td <- row.names(SDSres2)%in%row.names(subset(SDSres2,CHROMOSOME==paste0("Chr",i)))
-	SDSres2[td,17] <- prec
-}
-names(SDSres2)[17] <- "Rec"
-SDSres2$Rec <- as.numeric(SDSres2$Rec)
+# for(i in unique(cno)){
+	# rmc <- subset(recmaps,chr==i)
+	# mfit <- lm(cMperMb ~ mid + I(mid^2) + I(mid^3),data=rmc)
+	# prec <- predict(mfit,list(mid=subset(SDSres2,CHROMOSOME==paste0("Chr",i))$POS))
+	# td <- row.names(SDSres2)%in%row.names(subset(SDSres2,CHROMOSOME==paste0("Chr",i)))
+	# SDSres2[td,17] <- prec
+# }
+# names(SDSres2)[17] <- "Rec"
+# SDSres2$Rec <- as.numeric(SDSres2$Rec)
 
 # General Linear model fit, comparing milk and non-milk regions, Gamma link function. Takes a few minutes to run for each model fit
 SDSres2$CHROMOSOME <- factor(SDSres2$CHROMOSOME,levels=unique(SDSres2$CHROMOSOME))
 SDSres2$Bin <- factor(SDSres2$Bin,levels=unique(SDSres2$Bin))
 SDSres2$Bin <- relevel(SDSres2$Bin,ref="1")
 SDSres2$Milk <- relevel(SDSres2$Milk,ref="0")
-fitg <- glm(sSDS ~ CHROMOSOME + Bin + Rec + Milk,data=SDSres2,family=Gamma(link="inverse"));summary(fitg)
-fitg0 <- glm(sSDS ~ CHROMOSOME + Bin + Rec,data=SDSres2,family=Gamma(link="inverse"));summary(fitg0)
+fitg <- glm(sSDS ~ CHROMOSOME + Bin + Milk,data=SDSres2,family=Gamma(link="inverse"));summary(fitg)
+fitg0 <- glm(sSDS ~ CHROMOSOME + Bin,data=SDSres2,family=Gamma(link="inverse"));summary(fitg0)
 anova(fitg0,fitg,test="Chisq")
 
 # Print summary to file
@@ -245,7 +246,7 @@ fisher.test(testdat, alternative = "greater")
 sink()
 
 ## Part 3b: Look at absolute SDS within each milk-gene region, see which areas are outliers
-mpnames <- read.csv("milk_protein_names_Lemay_2009.csv")
+mpnames <- read.csv("Milk_Protein_Genes_Sept19/milk_protein_names_conv_Sept19.csv")
 mpnames$chrom <- factor(mpnames$chrom, levels=unique(SDSres$CHROMOSOME))
 mreg <- list()
 idx <- 1
@@ -276,10 +277,10 @@ mreg2 <- mreg[pt[order(pt$X1),2]]
 
 lth <- 4.5
 png(paste0('OutFigures/SDS_ByGene_Outliers_',fname,'N0.png'),width=lth*(1+sqrt(5)),height=2*lth,units = 'in',res=200)
-par(mar=c(5,7,2,1))
-boxplot(mreg2,border=c(rep("black",(length(mreg2)))),ylim=c(0,5),las=0,yaxt="n",xlab="Gene Names",cex.axis=0.9)
+par(mar=c(5,7.5,2,1))
+boxplot(mreg2,border=c(rep("black",(length(mreg2)))),ylim=c(0,4),las=0,yaxt="n",xlab="Gene Names",cex.axis=0.9)
 axis(2, at=c(0:5), las=2)
-text(x=-1,y=2.5,labels=paste("Absolute","Standardised","SDS",sep="\n"),xpd=NA)
+text(x=-0.85,y=2,labels=paste("Absolute","Standardised","SDS",sep="\n"),xpd=NA)
 title("Milk protein genes with significantly elevated SDS")
 abline(h=sqrt(2/pi),lwd=2,lty=2,col="gray60")
 dev.off()
@@ -293,6 +294,7 @@ names(mpsig) <- c("Chromosome","Gene Name","Start Position","End Position")
 write.csv(mpsig,file=paste0("OutTables/HighSDSMilk_",fname,"N0.csv"),quote=F,row.names=F)
 
 # Part 4: Reading in Stature QTL data. First where effect sizes estimated in 6 of 7 Holstein
+# These QTLs have positions relative to old assembly (UMD)
 milkQTL <- readRDS("QTLMilkDat/curated_stature_snps_6.rds")
 QTLi <- noquote(matrix(data=unlist(strsplit(milkQTL$position,":")),nrow=dim(milkQTL)[1],ncol=2,byrow=T))
 QTLi <- data.frame(CHROMOSOME=QTLi[,1],POS=QTLi[,2],milkQTL[,2])
@@ -301,7 +303,29 @@ QTLi <- QTLi[QTLi$CHROMOSOME!="Chr25",]
 QTLi$CHROMOSOME <- factor(QTLi$CHROMOSOME,levels=orderedChr)
 QTLi$POS <- as.numeric(QTLi$POS)
 QTLi$EFFECT <- as.numeric(QTLi$EFFECT)
-nQ <- dim(QTLi)[1];nQ	# Initial number of QTL (excluding Chr 25)
+
+# Obtaining new QTL positions in ARS-UCD assembly
+nQTL <- read.table("StatureQTLs_Dec19/securenew.qtl",head=T)		 		# 'Secure' QTLs
+nQTLn <- read.table("StatureQTLs_Dec19/nonsecurenew_edit.qtl",head=T)	 	# 'Nonsecure' QTLs (previously edited to only keep 'OK' ones)
+nQTL <- rbind(nQTL,nQTLn[,c(1:3,5)])
+nQTL <- nQTL[order(nQTL$UMDChr, nQTL$UMDPos),]
+nQTL$UMDChr <- paste("Chr",nQTL$UMDChr,sep="")
+nQTL$ARSChr <- paste("Chr",nQTL$ARSChr,sep="")
+nQTL <- nQTL[nQTL$UMDChr!="Chr25",]
+nQTL$UMDChr <- factor(nQTL$UMDChr,levels=orderedChr)
+nQTL$ARSChr <- factor(nQTL$ARSChr,levels=orderedChr)
+row.names(nQTL) <- c(1:dim(nQTL)[1])
+
+# Now matching old positions to new ones
+nidx <- match(QTLi$POS,nQTL$UMDPos)								# Finding new positions in lookup table
+QTLi <- cbind(QTLi,nQTL[nidx,c(3,4)])
+QTLi <- QTLi[!is.na(QTLi$ARSPos),]
+QTLi <- QTLi[QTLi$CHROMOSOME==QTLi$ARSChr,]
+QTLi$POS <- QTLi$ARSPos
+QTLi <- QTLi[,1:3]
+
+# Initial number of QTL (excluding Chr 25)
+nQ <- dim(QTLi)[1];nQ
 
 # Finding nearest SNP to each QTL
 QTLSDS <- matrix(data=NA,nrow=0,ncol=2)
@@ -321,9 +345,9 @@ nQ2 <- dim(QTLSDS)[1];nQ2	# Number of QTL with SNPs assigned to them
 
 # Setting up GLM, see if stature QTLs significantly differ from background
 SDSres2 <- cbind(SDSres2,vector(mode="numeric",length=dim(SDSres2)[1]))
-names(SDSres2)[18] <- "isnearQTL"
-SDSres2[,18] <- 0
-SDSres2[row.names(SDSres2)%in%QTLP,18] <- 1
+names(SDSres2)[17] <- "isnearQTL"
+SDSres2[,17] <- 0
+SDSres2[row.names(SDSres2)%in%QTLP,17] <- 1
 SDSres2$isnearQTL <- factor(SDSres2$isnearQTL,levels=unique(SDSres2$isnearQTL))
 SDSres2$isnearQTL <- relevel(SDSres2$isnearQTL,ref="0")
 
@@ -332,9 +356,9 @@ maxx <- ceiling(max(hist(SDSres2$sSDS, breaks=30, plot=F)$breaks))
 maxy <- max(max(hist(QTLSDS[,1], breaks=30, plot=F)$density),max(hist(SDSres2$sSDS, breaks=30, plot=F)$density))
 png(paste0('OutFigures/SDS_Abs_HistS_',fname,'N0_StatureQTL_6.png'),width=8,height=8,units = 'in',res=200)
 par(mar=c(5,6.5,4,1.5) + 0.1)
-hist(SDSres2$sSDS, breaks=30, prob=T, col=rgb(1,0,0,0.5), xlim=c(0,maxx), ylim=c(0, maxy), xaxt="n", yaxt="n", xlab="",ylab="",main="")
+hist(SDSres2$sSDS, breaks=30, prob=T, col=rgb(1,0,0,0.5), xlim=c(0,maxx), ylim=c(0, maxy+0.2), xaxt="n", yaxt="n", xlab="",ylab="",main="")
 axis(1,at=seq(0, maxx,1),pos=(0))
-axis(2, at=seq(0,maxy,0.5), las=2)
+axis(2, at=seq(0,maxy+0.2,0.2), las=2)
 title("Absolute Standardised SDS with Stature QTL Values",xlab="Absolute Standardised SDS")
 text(x=-1.25,y=(maxy/2),labels=paste("Density",sep="\n"),xpd=NA)
 hist(QTLSDS[,1], breaks=30, prob=T, col=rgb(0,0,1,0.5), add=T)
@@ -342,7 +366,7 @@ legend("topright", legend=c("All regions", "SNPs near stature QTLs"),col=c(rgb(1
 dev.off()
 
 # Running GLM analysis
-fitgQ <- glm(sSDS ~ CHROMOSOME + Bin + Rec + isnearQTL,data=SDSres2,family=Gamma(link="inverse"));summary(fitgQ)
+fitgQ <- glm(sSDS ~ CHROMOSOME + Bin + isnearQTL,data=SDSres2,family=Gamma(link="inverse"));summary(fitgQ)
 anova(fitg0,fitgQ,test="Chisq")
 
 # Print summary to file
@@ -371,6 +395,7 @@ fisher.test(testdat, alternative = "greater")
 sink()
 
 # Part 4a: Repeating for QTLs with effect sizes in at least 5 of 7 Holstein
+# Original co-ordinates in UMD assembly
 milkQTL <- readRDS("QTLMilkDat/curated_stature_snps_5.rds")
 QTLi <- noquote(matrix(data=unlist(strsplit(milkQTL$position,":")),nrow=dim(milkQTL)[1],ncol=2,byrow=T))
 QTLi <- data.frame(CHROMOSOME=QTLi[,1],POS=QTLi[,2],milkQTL[,2])
@@ -379,6 +404,15 @@ QTLi <- QTLi[QTLi$CHROMOSOME!="Chr25",]
 QTLi$CHROMOSOME <- factor(QTLi$CHROMOSOME,levels=orderedChr)
 QTLi$POS <- as.numeric(QTLi$POS)
 QTLi$EFFECT <- as.numeric(QTLi$EFFECT)
+
+# Now matching old positions to new ones
+nidx <- match(QTLi$POS,nQTL$UMDPos)								# Finding new positions in lookup table
+QTLi <- cbind(QTLi,nQTL[nidx,c(3,4)])
+QTLi <- QTLi[!is.na(QTLi$ARSPos),]
+QTLi <- QTLi[QTLi$CHROMOSOME==QTLi$ARSChr,]
+QTLi$POS <- QTLi$ARSPos
+QTLi <- QTLi[,1:3]
+
 nQ <- dim(QTLi)[1];nQ	# Initial number of QTL (excluding Chr 25)
 
 # Finding nearest SNP to each QTL
@@ -398,8 +432,8 @@ for(i in unique(SDSres2$CHROMOSOME)){
 nQ2 <- dim(QTLSDS)[1];nQ2	# Number of QTL with SNPs assigned to them
 
 # Setting up GLM, see if stature QTLs significantly differ from background
-SDSres2[,18] <- 0
-SDSres2[row.names(SDSres2)%in%QTLP,18] <- 1
+SDSres2[,17] <- 0
+SDSres2[row.names(SDSres2)%in%QTLP,17] <- 1
 SDSres2$isnearQTL <- factor(SDSres2$isnearQTL,levels=unique(SDSres2$isnearQTL))
 SDSres2$isnearQTL <- relevel(SDSres2$isnearQTL,ref="0")
 
@@ -408,9 +442,9 @@ maxx <- ceiling(max(hist(SDSres2$sSDS, breaks=30, plot=F)$breaks))
 maxy <- max(max(hist(QTLSDS[,1], breaks=30, plot=F)$density),max(hist(SDSres2$sSDS, breaks=30, plot=F)$density))
 png(paste0('OutFigures/SDS_Abs_HistS_',fname,'N0_StatureQTL_5.png'),width=8,height=8,units = 'in',res=200)
 par(mar=c(5,6.5,4,1.5) + 0.1)
-hist(SDSres2$sSDS, breaks=30, prob=T, col=rgb(1,0,0,0.5), xlim=c(0,maxx), ylim=c(0, maxy), xaxt="n", yaxt="n", xlab="",ylab="",main="")
+hist(SDSres2$sSDS, breaks=30, prob=T, col=rgb(1,0,0,0.5), xlim=c(0,maxx), ylim=c(0, maxy+0.2), xaxt="n", yaxt="n", xlab="",ylab="",main="")
 axis(1,at=seq(0, maxx,1),pos=(0))
-axis(2, at=seq(0,maxy,0.2), las=2)
+axis(2, at=seq(0,maxy+0.2,0.2), las=2)
 title("Absolute Standardised SDS with Stature QTL Values",xlab="Absolute Standardised SDS")
 text(x=-1.25,y=(maxy/2),labels=paste("Density",sep="\n"),xpd=NA)
 hist(QTLSDS[,1], breaks=30, prob=T, col=rgb(0,0,1,0.5), add=T)
@@ -418,7 +452,7 @@ legend("topright", legend=c("All regions", "SNPs near stature QTLs"),col=c(rgb(1
 dev.off()
 
 # Running GLM analysis
-fitgQ <- glm(sSDS ~ CHROMOSOME + Bin + Rec + isnearQTL,data=SDSres2,family=Gamma(link="inverse"));summary(fitgQ)
+fitgQ <- glm(sSDS ~ CHROMOSOME + Bin + isnearQTL,data=SDSres2,family=Gamma(link="inverse"));summary(fitgQ)
 anova(fitg0,fitgQ,test="Chisq")
 
 # Print summary to file
