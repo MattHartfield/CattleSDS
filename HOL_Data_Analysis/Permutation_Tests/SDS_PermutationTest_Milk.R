@@ -7,6 +7,7 @@
 # 1 = High N0 case; 2 = Low N0 case
 args <- commandArgs(trailingOnly = TRUE)
 ind <- as.integer(args[1])
+perms <- as.integer(args[2])
 if(ind == 1){
 	fname <- "High"
 }else if(ind == 2){
@@ -32,13 +33,16 @@ SDSres$CHROMOSOME = factor(SDSres$CHROMOSOME,levels=orderedChr)
 # Obtaining (1) starting point of each chromosome (2) length of chromosome
 # For permutation analyses, to determine where to place SNPs
 minp <- vector(mode="numeric",length=length(cno))
+maxp <- vector(mode="numeric",length=length(cno))
 lengthp <- vector(mode="numeric",length=length(cno))
 names(minp) <- factor(orderedChr)
+names(maxp) <- factor(orderedChr)
 names(lengthp) <- factor(orderedChr)
 for(i in unique(SDSres$CHROMOSOME)){
 	SDST <- subset(SDSres,CHROMOSOME==i)
 	minp[i] <- min(SDST$POS)
-	lengthp[i] <- max(SDST$POS)-min(SDST$POS)
+	maxp[i] <- max(SDST$POS)
+	lengthp[i] <- maxp[i] - minp[i]
 }
 
 SDSres <- cbind(SDSres,as.numeric(cut(SDSres[,6],seq(0.05,0.95,0.05),include.lowest = T)))
@@ -90,10 +94,9 @@ names(milky) <- c("chrom","chromStart","chromEnd")
 milky$chrom <- factor(milky$chrom, levels=unique(SDSres$CHROMOSOME))
 milkreg <- vector(mode="numeric",length=0)
 muse <- vector(mode="numeric",length=length(sort(unique(milky$chrom))))
-#mlen <- vector(mode="numeric",length=length(sort(unique(milky$chrom))))
 glen <- as.data.frame(matrix(nrow=0,ncol=2))
+names(glen) <- c("chrom","geneLength")
 names(muse) <- (unique(milky$chrom))
-#names(mlen) <- (unique(milky$chrom))
 for(i in unique(milky$chrom)){
 	hpss <- as.matrix(subset(milky,chrom==i)[2:3])
 	SDST <- subset(SDSres2,CHROMOSOME==i)
@@ -101,19 +104,19 @@ for(i in unique(milky$chrom)){
 	if(length(listres) > 0){
 		if(dim(hpss)[1]!=1){
 			muse[names(muse)==i] <- sum(lapply(listres,length)!=0)
-#			mlen[names(mlen)==i] <- sum(hpss[which(lapply(listres,length)!=0),2]-hpss[which(lapply(listres,length)!=0),1])
-
-			# To check and implement for hpss == 1
-			glen <- rbind(glen,cbind(as.data.frame.factor(i),hpss[which(lapply(listres,length)!=0),2]-hpss[which(lapply(listres,length)!=0),1]))
+			gli <- cbind(as.data.frame.factor(i),hpss[which(lapply(listres,length)!=0),2]-hpss[which(lapply(listres,length)!=0),1])
 		}else if(dim(hpss)[1]==1){
 			muse[names(muse)==i] <- sum(length(listres)!=0)
-			mlen[names(mlen)==i] <- hpss[which(length(listres)!=0),2]-hpss[which(length(listres)!=0),1]
+			gli <- cbind(as.data.frame.factor(i),hpss[which(length(listres)!=0),2]-hpss[which(length(listres)!=0),1])
 		}
+		names(gli) <- c("chrom","geneLength")
+		glen <- rbind(glen, gli)
 	}
 	milkreg<-c(milkreg,unlist(listres))
 }
 names(milkreg) <- NULL
 names(glen) <- c("chrom","geneLength")
+row.names(glen) <- c(1:dim(glen)[1])
 
 # Adding column stating if SNPs lie within a milk-producing region
 SDSres2 <- cbind(SDSres2,vector(mode="numeric",length=dim(SDSres2)[1]))
@@ -131,7 +134,7 @@ SDSres2$Milk <- relevel(SDSres2$Milk,ref="0")
 fitg <- glm(sSDS ~ CHROMOSOME + Bin + Milk,data=SDSres2,family=Gamma(link="inverse"));summary(fitg)
 fitg0 <- glm(sSDS ~ CHROMOSOME + Bin,data=SDSres2,family=Gamma(link="inverse"));summary(fitg0)
 anova(fitg0,fitg,test="Chisq")
-pvalA <- anova(fitg0,fitg)$"F"[2]
+pvalA <- anova(fitg0,fitg)$"Deviance"[2]
 
 # Print summary to file
 sink(file=paste0("OutTables/Milk_GLM_Summary_",fname,"N0_FromPermutationTest.txt"))
@@ -140,45 +143,95 @@ anova(fitg0,fitg,test="Chisq")
 sink()
 
 # Now permutation analyses
-perms <- 500
-mtot <- sum(muse)
-bins <- round(mean(mlen)/2)	# Note factor of two since we look both up- and downstream of the target SNPs
-#bins <- 12500
 pvals <- vector(mode="numeric",length=perms)
 for(j in 1:perms){
-	nsnps <- rmultinom(1, mtot, prob = (lengthp - 2*bins) )		# Number of pseudo SNPs on each region 
-	# Creating pseudo-stature table
-	for(i in unique(SDSres$CHROMOSOME)){
-		SDST2 <- data.frame(cbind(rep(i,nsnps[row.names(nsnps)==i,]),sort(floor(runif(nsnps[row.names(nsnps)==i,],min=(minp[i]+bins),max=(minp[i]+lengthp[i]-2*bins))))))
-		names(SDST2) <- c("CHR","BP")
-		SDST2$CHR <- factor(SDST2$CHR,levels=levels(SigSDSRes2$CHROMOSOME))
-		SDST2$BP <- as.numeric(as.character(SDST2$BP))
-		if(i=="Chr1"){
-			milkyP <- SDST2
-		}else if(i!="Chr1"){
-			milkyP <- rbind(milkyP, SDST2)
+	
+	print(paste0("Permutation number ",j))
+	
+	corrfac <- vector(mode="numeric",length=length(cno))
+	names(corrfac) <- factor(orderedChr)
+	
+	milkreg <- vector(mode="numeric",length=0)
+	SDSres3 <- SDSres2
+	SDSres3[,16] <- 0
+	
+	# Assigning genes to random regions
+	for(k in 1:dim(glen)[1]){
+		
+		if(k%%10==0){
+			print(paste0("Assigning gene number ",k))
+		}
+		
+		isdone <- 0
+		while(isdone == 0){		
+			ctou <- which(rmultinom(1, 1, prob = (lengthp - corrfac))==1)	# Chromosome to place
+			spos <- runif(1,minp[ctou],minp[ctou]+lengthp[ctou])	# Start position
+			dir <- rbinom(1,1,0.5)	# Whether to go up, downstream
+			# Draw end position
+			if(dir==0){
+				epos <- spos + glen[k,2]
+			}else if(dir==1){
+				epos <- spos
+				spos <- epos - glen[k,2]
+			}
+			
+			# Defining new milk regions
+			SDST <- subset(SDSres3,CHROMOSOME==orderedChr[ctou])
+			mrt <- row.names(SDST[intersect(which(SDST[SDST$CHROMOSOME==orderedChr[ctou],5] >= spos), which(SDST[SDST$CHROMOSOME==orderedChr[ctou],5] <= epos)),])
+			# Check if region already exists, if not then proceed
+			if(length(intersect(mrt,milkreg)) == 0){
+				SDSres3[row.names(SDSres3)%in%mrt,16] <- 1
+				milkreg <- c(milkreg,mrt)
+		
+				# Calculating new correction factors, assuming 
+				isinl <- (spos > minp[ctou])
+				isinr <- (epos < maxp[ctou])
+				isin <- ((isinl==1) && (isinr==1))
+			
+				corradd <- 0
+				if(isin==1){
+					corradd <- glen[k,2]		
+				}else{
+					if(isinl==0){
+						corradd <- (epos-minp[ctou])
+					}
+					if(isinr==0){
+						corradd <- (maxp[ctou]-spos)
+					}
+				}
+				corrfac[ctou] <- corrfac[ctou] + corradd
+				isdone <- 1
+			}
 		}
 	}
 
-	# Classifying regions based on random SNPs
-	milkreg <- vector(mode="numeric",length=0)
-	for(i in sort(unique(milkyP$CHR))){
-		hpss <- as.matrix(cbind(subset(milkyP,CHR==i)[2]-bins,subset(milkyP,CHR==i)[2]+bins))
-		SDST <- subset(SDSres2,CHROMOSOME==i)
-		milkreg<-c(milkreg,unlist(apply(hpss,1,function(x) row.names(SDST[intersect(which(SDST[SDST$CHROMOSOME==i,5] >= x[1]), which(SDST[SDST$CHROMOSOME==i,5] <= x[2])),]))))
-	}
-	names(milkreg) <- NULL
-	SDSres3 <- SDSres2
-	SDSres3[row.names(SDSres3)%in%milkreg,16] <- 1
-	SDSres3[!(row.names(SDSres3)%in%milkreg),16] <- 0
+	# Performing model fit on permutated dataset
+	print(paste0("Performing model fit number ",j))
 	SDSres3$Milk <- factor(SDSres3$Milk,levels=unique(SDSres3$Milk))
+	SDSres3$CHROMOSOME <- factor(SDSres3$CHROMOSOME,levels=unique(SDSres3$CHROMOSOME))
 	SDSres3$Bin <- factor(SDSres3$Bin,levels=unique(SDSres3$Bin))
+	SDSres2$Bin <- relevel(SDSres3$Bin,ref="1")
 	SDSres3$Milk <- relevel(SDSres3$Milk,ref="0")
-	fit <- lm(sSDS ~ CHROMOSOME + Bin + Milk,data=SDSres3)
-	fit0 <- lm(sSDS ~ CHROMOSOME + Bin,data=SDSres3)
-	pvals[j] <- anova(fit0,fit)$"F"[2]	# P-value of comparison
+	fit <- glm(sSDS ~ CHROMOSOME + Bin + Milk,data=SDSres3,family=Gamma(link="inverse"))
+	pvals[j] <- anova(fitg0,fit)$"Deviance"[2]	# P-value of comparison
 }
 
-write.table(c(pvalA,pvals),file=paste0("PermTest_n",perms,"_",fname,"N0_Milk.dat"), quote = F, row.names = F, col.names = F)
+# How many permuted deviance values are greater than actual (P-value)?
+propdev <- sum(pvalA<pvals)/perms
+
+# Outputting deviance values
+write.table(c(pvalA,pvals,propdev),file=paste0("OutTables/PermTest_n",perms,"_",fname,"N0_Milk.dat"), quote = F, row.names = F, col.names = F)
+
+# Histogram of permuted values, along with actual value
+png(paste0('OutFigures/SDS_Milk_Permutations_',fname,'N0.png'),width=8,height=8,units = 'in',res=200)
+par(mar=c(5,6.5,4,1.5) + 0.1)
+hist(pvals, breaks=30, prob=T, col=rgb(0,0,0,0.25), xlab="", ylab="", main="", xaxt="n", yaxt="n", xlim=c(0,100))
+maxy <- max(hist(pvals,breaks=30,plot=F)$density)
+axis(1,at=seq(0, 100, 20),pos=(0))
+axis(2, at=seq(0,maxy,maxy/4), las=2)
+title("Histogram of Randomised Deviance Values",xlab="Deviance Values")
+text(x=(-20),y=maxy/2,labels=paste("Density",sep="\n"),xpd=NA)
+abline(v=pvalA,lty=2,lwd=2)
+dev.off()
 
 # EOF
