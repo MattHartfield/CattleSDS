@@ -338,7 +338,6 @@ for(i in unique(SDSres2$CHROMOSOME)){
 	QTLT <- QTLT[!(apply(QTLT,1,function(x) SDST[which(abs(SDST$POS-as.numeric(x[2]))==min(abs(SDST$POS-as.numeric(x[2])))),5])%in%bounds),]	# Removing QTLs where nearest SNP is at edge of range
 	PT <- apply(QTLT,1,function(x) SDST[which(abs(SDST$POS-as.numeric(x[2]))==min(abs(SDST$POS-as.numeric(x[2])))),5])
 	QTLP <- c(QTLP,row.names(SDST[SDST$POS%in%PT,]))
-	rbind(SDST[SDST$POS%in%PT,13], QTLT[,3])	
 	QTLSDS <- rbind(QTLSDS,cbind(SDST[SDST$POS%in%PT,13], abs(QTLT[,3])))
 }
 nQ2 <- dim(QTLSDS)[1];nQ2	# Number of QTL with SNPs assigned to them
@@ -426,7 +425,6 @@ for(i in unique(SDSres2$CHROMOSOME)){
 	QTLT <- QTLT[!(apply(QTLT,1,function(x) SDST[which(abs(SDST$POS-as.numeric(x[2]))==min(abs(SDST$POS-as.numeric(x[2])))),5])%in%bounds),]	# Removing QTLs where nearest SNP is at edge of range
 	PT <- apply(QTLT,1,function(x) SDST[which(abs(SDST$POS-as.numeric(x[2]))==min(abs(SDST$POS-as.numeric(x[2])))),5])
 	QTLP <- c(QTLP,row.names(SDST[SDST$POS%in%PT,]))
-	rbind(SDST[SDST$POS%in%PT,13], QTLT[,3])	
 	QTLSDS <- rbind(QTLSDS,cbind(SDST[SDST$POS%in%PT,13], abs(QTLT[,3])))
 }
 nQ2 <- dim(QTLSDS)[1];nQ2	# Number of QTL with SNPs assigned to them
