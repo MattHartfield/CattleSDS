@@ -1,13 +1,14 @@
-# 11th Dec 2019
+# 17th Dec 2019
 # R Script for carrying out permutation test on milk-protein genes
 
 # First decide which dataset to use
 # Set up so one can run from command line
 # Otherwise one can set 'ind' manually
 # 1 = High N0 case; 2 = Low N0 case
+# This version only runs one permutation, so can be parallelised on cluster
 args <- commandArgs(trailingOnly = TRUE)
 ind <- as.integer(args[1])
-perms <- as.integer(args[2])
+idx <- as.integer(args[2])
 if(ind == 1){
 	fname <- "High"
 }else if(ind == 2){
@@ -24,8 +25,11 @@ fnP <- function(x){
 }
 
 library(qvalue)
-setwd("/Users/hartfield/Documents/MilkSDS/HOL_Data_Analysis")
-SDSres <- read.table(paste0("SDSAll_",fname,"N0.dat"),header=T)
+theseed <- sample(2147483647-1,1)
+set.seed(theseed)
+cat("Seed is ", theseed, "\n")
+#setwd("/Users/hartfield/Documents/MilkSDS/HOL_Data_Analysis")
+SDSres <- read.table(paste0("../SDSAll_",fname,"N0.dat"),header=T)
 cno <- c(1:24,26:29)
 orderedChr=paste("Chr",cno, sep="")
 SDSres$CHROMOSOME = factor(SDSres$CHROMOSOME,levels=orderedChr)
@@ -84,12 +88,13 @@ row.names(SDSres2) <- c(1:dim(SDSres2)[1])
 SDSres2$CHROMOSOME = factor(SDSres2$CHROMOSOME,levels=orderedChr)
 
 # Has masking worked? Should give integer(0)
+print("If masking worked then should produce integer(0):")
 intersect(which((SDSres2[,14] < alpha)),which((as.numeric(as.character(SDSres2[,9])) >= 1)))
 
 # Reading in and classifying milk-producing regions
 # From milk-protein gene set (additional data file 2 from Lemay et al 2009 Genome Biology)
 # Then including milk-gene as a factor. Putting scores in bins, determining effect of milk on SDS.
-milky <- read.table("Milk_Protein_Genes_Sept19/milk_protein_names_conv_Sept19.bed",skip=1)[,1:3] # Only including gene locations and autosomal genes
+milky <- read.table("milk_protein_names_conv_Sept19.bed",skip=1)[,1:3] # Only including gene locations and autosomal genes
 names(milky) <- c("chrom","chromStart","chromEnd")
 milky$chrom <- factor(milky$chrom, levels=unique(SDSres$CHROMOSOME))
 milkreg <- vector(mode="numeric",length=0)
@@ -131,115 +136,88 @@ SDSres2$CHROMOSOME <- factor(SDSres2$CHROMOSOME,levels=unique(SDSres2$CHROMOSOME
 SDSres2$Bin <- factor(SDSres2$Bin,levels=unique(SDSres2$Bin))
 SDSres2$Bin <- relevel(SDSres2$Bin,ref="1")
 SDSres2$Milk <- relevel(SDSres2$Milk,ref="0")
-fitg <- glm(sSDS ~ CHROMOSOME + Bin + Milk,data=SDSres2,family=Gamma(link="inverse"));summary(fitg)
-fitg0 <- glm(sSDS ~ CHROMOSOME + Bin,data=SDSres2,family=Gamma(link="inverse"));summary(fitg0)
-anova(fitg0,fitg,test="Chisq")
+fitg <- glm(sSDS ~ CHROMOSOME + Bin + Milk,data=SDSres2,family=Gamma(link="inverse"))
+fitg0 <- glm(sSDS ~ CHROMOSOME + Bin,data=SDSres2,family=Gamma(link="inverse"))
+#anova(fitg0,fitg,test="Chisq")
 pvalA <- anova(fitg0,fitg)$"Deviance"[2]
 
 # Print summary to file
-sink(file=paste0("OutTables/Milk_GLM_Summary_",fname,"N0_FromPermutationTest.txt"))
-summary(fitg)
-anova(fitg0,fitg,test="Chisq")
-sink()
-
-# Now permutation analyses
-pvals <- vector(mode="numeric",length=perms)
-for(j in 1:perms){
-	
-	if(j%%100==0){
-		print(paste0("Permutation number ",j))
-	}
-	
-	corrfac <- vector(mode="numeric",length=length(cno))
-	names(corrfac) <- factor(orderedChr)
-	
-	milkreg <- vector(mode="numeric",length=0)
-	SDSres3 <- SDSres2
-	SDSres3[,16] <- 0
-	
-	# Assigning genes to random regions
-	for(k in 1:dim(glen)[1]){
-		
-		if(k%%10==0){
-			print(paste0("Assigning gene number ",k))
-		}
-		
-		isdone <- 0
-		while(isdone == 0){		
-			ctou <- which(rmultinom(1, 1, prob = (lengthp - corrfac))==1)	# Chromosome to place
-			spos <- runif(1,minp[ctou],minp[ctou]+lengthp[ctou])	# Start position
-			dir <- rbinom(1,1,0.5)	# Whether to go up, downstream
-			# Draw end position
-			if(dir==0){
-				epos <- spos + glen[k,2]
-			}else if(dir==1){
-				epos <- spos
-				spos <- epos - glen[k,2]
-			}
-			
-			# Defining new milk regions
-			SDST <- subset(SDSres3,CHROMOSOME==orderedChr[ctou])
-			mrt <- row.names(SDST[intersect(which(SDST[SDST$CHROMOSOME==orderedChr[ctou],5] >= spos), which(SDST[SDST$CHROMOSOME==orderedChr[ctou],5] <= epos)),])
-			# Check if region already exists, if not then proceed
-			if(length(intersect(mrt,milkreg)) == 0){
-				SDSres3[row.names(SDSres3)%in%mrt,16] <- 1
-				milkreg <- c(milkreg,mrt)
-		
-				# Calculating new correction factors, assuming 
-				isinl <- (spos > minp[ctou])
-				isinr <- (epos < maxp[ctou])
-				isin <- ((isinl==1) && (isinr==1))
-			
-				corradd <- 0
-				if(isin==1){
-					corradd <- glen[k,2]		
-				}else{
-					if(isinl==0){
-						corradd <- (epos-minp[ctou])
-					}
-					if(isinr==0){
-						corradd <- (maxp[ctou]-spos)
-					}
-				}
-				corrfac[ctou] <- corrfac[ctou] + corradd
-				isdone <- 1
-			}
-		}
-	}
-
-	# Performing model fit on permutated dataset
-	print(paste0("Performing model fit number ",j))
-	SDSres3$Milk <- factor(SDSres3$Milk,levels=unique(SDSres3$Milk))
-	SDSres3$CHROMOSOME <- factor(SDSres3$CHROMOSOME,levels=unique(SDSres3$CHROMOSOME))
-	SDSres3$Bin <- factor(SDSres3$Bin,levels=unique(SDSres3$Bin))
-	SDSres2$Bin <- relevel(SDSres3$Bin,ref="1")
-	SDSres3$Milk <- relevel(SDSres3$Milk,ref="0")
-	fit <- glm(sSDS ~ CHROMOSOME + Bin + Milk,data=SDSres3,family=Gamma(link="inverse"))
-	pvals[j] <- anova(fitg0,fit)$"Deviance"[2]	# P-value of comparison
+if(idx == 1){
+	sink(file=paste0("OutTables/Milk_GLM_Summary_",fname,"N0_FromPermutationTest.txt"))
+	summary(fitg)
+	anova(fitg0,fitg,test="Chisq")
+	sink()
 }
 
-# How many permuted deviance values are greater than actual (P-value)?
-propdev <- sum(pvalA<pvals)/perms
+# Now permutation analyses	
+corrfac <- vector(mode="numeric",length=length(cno))
+names(corrfac) <- factor(orderedChr)
+
+milkreg <- vector(mode="numeric",length=0)
+SDSres3 <- SDSres2
+SDSres3[,16] <- 0
+
+# Assigning genes to random regions
+for(k in 1:dim(glen)[1]){
+	
+	if(k%%10==0){
+		print(paste0("Assigning gene number ",k))
+	}
+	
+	isdone <- 0
+	while(isdone == 0){		
+		ctou <- which(rmultinom(1, 1, prob = (lengthp - corrfac))==1)	# Chromosome to place
+		spos <- runif(1,minp[ctou],minp[ctou]+lengthp[ctou])	# Start position
+		dir <- rbinom(1,1,0.5)	# Whether to go up, downstream
+		# Draw end position
+		if(dir==0){
+			epos <- spos + glen[k,2]
+		}else if(dir==1){
+			epos <- spos
+			spos <- epos - glen[k,2]
+		}
+		
+		# Defining new milk regions
+		SDST <- subset(SDSres3,CHROMOSOME==orderedChr[ctou])
+		mrt <- row.names(SDST[intersect(which(SDST[SDST$CHROMOSOME==orderedChr[ctou],5] >= spos), which(SDST[SDST$CHROMOSOME==orderedChr[ctou],5] <= epos)),])
+		# Check if region already exists, if not then proceed
+		if(length(intersect(mrt,milkreg)) == 0){
+			SDSres3[row.names(SDSres3)%in%mrt,16] <- 1
+			milkreg <- c(milkreg,mrt)
+	
+			# Calculating new correction factors, assuming 
+			isinl <- (spos > minp[ctou])
+			isinr <- (epos < maxp[ctou])
+			isin <- ((isinl==1) && (isinr==1))
+		
+			corradd <- 0
+			if(isin==1){
+				corradd <- glen[k,2]		
+			}else{
+				if(isinl==0){
+					corradd <- (epos-minp[ctou])
+				}
+				if(isinr==0){
+					corradd <- (maxp[ctou]-spos)
+				}
+			}
+			corrfac[ctou] <- corrfac[ctou] + corradd
+			isdone <- 1
+		}
+	}
+}
+
+# Performing model fit on permutated dataset
+print("Performing model fit on permuted data")
+SDSres3$Milk <- factor(SDSres3$Milk,levels=unique(SDSres3$Milk))
+SDSres3$CHROMOSOME <- factor(SDSres3$CHROMOSOME,levels=unique(SDSres3$CHROMOSOME))
+SDSres3$Bin <- factor(SDSres3$Bin,levels=unique(SDSres3$Bin))
+SDSres2$Bin <- relevel(SDSres3$Bin,ref="1")
+SDSres3$Milk <- relevel(SDSres3$Milk,ref="0")
+fit <- glm(sSDS ~ CHROMOSOME + Bin + Milk,data=SDSres3,family=Gamma(link="inverse"))
+pvals <- anova(fitg0,fit)$"Deviance"[2]	# P-value of comparison
 
 # Outputting deviance values
-write.table(c(pvalA,pvals,propdev),file=paste0("OutTables/PermTest_n",perms,"_",fname,"N0_Milk.dat"), quote = F, row.names = F, col.names = F)
-
-# Histogram of permuted values, along with actual value
-png(paste0('OutFigures/SDS_Milk_Permutations_',fname,'N0.png'),width=8,height=8,units = 'in',res=200)
-par(mar=c(5,6.5,4,1.5) + 0.1)
-maxx <- max(hist(pvals,breaks=30,plot=F)$breaks)
-nt <- 5
-while(pvalA > maxx){
-	maxx <- maxx*1.2
-	nt <- nt + 1
-}
-maxy <- max(hist(pvals,breaks=30,plot=F)$density)
-hist(pvals, breaks=30, prob=T, col=rgb(0,0,0,0.25), xlab="", ylab="", main="", xaxt="n", yaxt="n", xlim=c(0,maxx))
-axis(1, at=seq(0, maxx, maxx/nt), pos=0)
-axis(2, at=seq(0,maxy,maxy/4), las=2)
-title("Histogram of Randomised Deviance Values, Milk Protein Genes",xlab="Deviance Values")
-text(x=(-maxx/5),y=maxy/2,labels=paste("Density",sep="\n"),xpd=NA)
-abline(v=pvalA,lty=2,lwd=2)
-dev.off()
+write.table(c(pvalA,pvals),file=paste0("OutTables/PermTest_n",idx,"_",fname,"N0_Milk.dat"), quote = F, row.names = F, col.names = F)
 
 # EOF

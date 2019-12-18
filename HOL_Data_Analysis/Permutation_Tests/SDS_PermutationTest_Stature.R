@@ -5,9 +5,10 @@
 # Set up so one can run from command line
 # Otherwise one can set 'ind' manually
 # 1 = High N0 case; 2 = Low N0 case
+# This version only runs one permutation, so can be parallelised on cluster
 args <- commandArgs(trailingOnly = TRUE)
 ind <- as.integer(args[1])
-perms <- as.integer(args[2])
+idx <- as.integer(args[2])
 minbr <- as.integer(args[3])
 if(ind == 1){
 	fname <- "High"
@@ -25,8 +26,11 @@ fnP <- function(x){
 }
 
 library(qvalue)
-setwd("/Users/hartfield/Documents/MilkSDS/HOL_Data_Analysis")
-SDSres <- read.table(paste0("SDSAll_",fname,"N0.dat"),header=T)
+theseed <- sample(2147483647-1,1)
+set.seed(theseed)
+cat("Seed is ", theseed, "\n")
+#setwd("/Users/hartfield/Documents/MilkSDS/HOL_Data_Analysis")
+SDSres <- read.table(paste0("../SDSAll_",fname,"N0.dat"),header=T)
 cno <- c(1:24,26:29)
 orderedChr=paste("Chr",cno, sep="")
 SDSres$CHROMOSOME = factor(SDSres$CHROMOSOME,levels=orderedChr)
@@ -85,10 +89,11 @@ row.names(SDSres2) <- c(1:dim(SDSres2)[1])
 SDSres2$CHROMOSOME = factor(SDSres2$CHROMOSOME,levels=orderedChr)
 
 # Has masking worked? Should give integer(0)
+print("If masking worked then should produce integer(0):")
 intersect(which((SDSres2[,14] < alpha)),which((as.numeric(as.character(SDSres2[,9])) >= 1)))
 
 # Reading in Stature QTL data. These QTLs have positions relative to old assembly (UMD)
-milkQTL <- readRDS(paste0("QTLMilkDat/curated_stature_snps_",minbr,".rds"))
+milkQTL <- readRDS(paste0("curated_stature_snps_",minbr,".rds"))
 QTLi <- noquote(matrix(data=unlist(strsplit(milkQTL$position,":")),nrow=dim(milkQTL)[1],ncol=2,byrow=T))
 QTLi <- data.frame(CHROMOSOME=QTLi[,1],POS=QTLi[,2],milkQTL[,2])
 names(QTLi)[3] <- "EFFECT"
@@ -98,8 +103,8 @@ QTLi$POS <- as.numeric(QTLi$POS)
 QTLi$EFFECT <- as.numeric(QTLi$EFFECT)
 
 # Obtaining new QTL positions in ARS-UCD assembly
-nQTL <- read.table("StatureQTLs_Dec19/securenew.qtl",head=T)		 		# 'Secure' QTLs
-nQTLn <- read.table("StatureQTLs_Dec19/nonsecurenew_edit.qtl",head=T)	 	# 'Nonsecure' QTLs (previously edited to only keep 'OK' ones)
+nQTL <- read.table("securenew.qtl",head=T)		 		# 'Secure' QTLs
+nQTLn <- read.table("nonsecurenew_edit.qtl",head=T)	 	# 'Nonsecure' QTLs (previously edited to only keep 'OK' ones)
 nQTL <- rbind(nQTL,nQTLn[,c(1:3,5)])
 nQTL <- nQTL[order(nQTL$UMDChr, nQTL$UMDPos),]
 nQTL$UMDChr <- paste("Chr",nQTL$UMDChr,sep="")
@@ -148,87 +153,61 @@ SDSres2$Bin <- relevel(SDSres2$Bin,ref="1")
 # Running GLM analysis
 fitgQ <- glm(sSDS ~ CHROMOSOME + Bin + isnearQTL,data=SDSres2,family=Gamma(link="inverse"))
 fitg0 <- glm(sSDS ~ CHROMOSOME + Bin,data=SDSres2,family=Gamma(link="inverse"))
-anova(fitg0,fitgQ,test="Chisq")
+#anova(fitg0,fitgQ,test="Chisq")
 pvalA <- anova(fitg0,fitgQ)$"Deviance"[2]
 
 # Print summary to file
-sink(file=paste0("OutTables/Stature_GLM_Summary_",minbr,"_",fname,"N0_FromPermutationTest.txt"))
-cat(paste0("Number of QTL initially ",nQ,"; with SNP effects assigned, ",nQ2,"\n"))
-summary(fitgQ)
-anova(fitg0,fitgQ,test="Chisq")
-sink()
+if(idx == 1){
+	sink(file=paste0("OutTables/Stature_GLM_Summary_",minbr,"_",fname,"N0_FromPermutationTest.txt"))
+	cat(paste0("Number of QTL initially ",nQ,"; with SNP effects assigned, ",nQ2,"\n"))
+	summary(fitgQ)
+	anova(fitg0,fitgQ,test="Chisq")
+	sink()
+}
 
 # Now permutation analyses
-pvals <- vector(mode="numeric",length=perms)
-for(j in 1:perms){
-	
-	if(j%%100==0){
-		print(paste0("Permutation number ",j))
-	}
 
-	QPermPos <- vector(mode="numeric",length=0)
-	SDSres3 <- SDSres2
-	SDSres3[,16] <- 0
+QPermPos <- vector(mode="numeric",length=0)
+SDSres3 <- SDSres2
+SDSres3[,16] <- 0
+
+# Assigning QTLs to random sites
+for(k in 1:nQ2){
 	
-	# Assigning QTLs to random sites
-	for(k in 1:nQ2){
+	if(k%%10==0){
+		print(paste0("Assigning QTL number ",k))
+	}
+	
+	isdone <- 0
+	while(isdone == 0){
+		ctou <- which(rmultinom(1, 1, prob = lengthp)==1)	# Chromosome to place
+		qpos <- runif(1,minp[ctou],minp[ctou]+lengthp[ctou])	# Start position
 		
-		if(k%%10==0){
-			print(paste0("Assigning QTL number ",k))
-		}
+		# Defining new QTL position
+		SDST <- subset(SDSres3,CHROMOSOME==orderedChr[ctou])
+		qpt <- SDST[which(abs(SDST$POS-qpos)==min(abs(SDST$POS-qpos))),5]
+		qprt <- row.names(SDST[SDST$POS%in%qpt,])
 		
-		isdone <- 0
-		while(isdone == 0){
-			ctou <- which(rmultinom(1, 1, prob = lengthp)==1)	# Chromosome to place
-			qpos <- runif(1,minp[ctou],minp[ctou]+lengthp[ctou])	# Start position
-			
-			# Defining new QTL position
-			SDST <- subset(SDSres3,CHROMOSOME==orderedChr[ctou])
-			qpt <- SDST[which(abs(SDST$POS-qpos)==min(abs(SDST$POS-qpos))),5]
-			qprt <- row.names(SDST[SDST$POS%in%qpt,])
-			
-			# Check if region already exists, if not then proceed
-			if(length(intersect(qpt,QPermPos)) == 0){
-				SDSres3[row.names(SDSres3)%in%qprt,16] <- 1
-				QPermPos <- c(QPermPos,qprt)
-				isdone <- 1
-			}
+		# Check if region already exists, if not then proceed
+		if(length(intersect(qpt,QPermPos)) == 0){
+			SDSres3[row.names(SDSres3)%in%qprt,16] <- 1
+			QPermPos <- c(QPermPos,qprt)
+			isdone <- 1
 		}
 	}
-
-	# Performing model fit on permutated dataset
-	print(paste0("Performing model fit number ",j))
-	SDSres2$isnearQTL <- factor(SDSres2$isnearQTL,levels=unique(SDSres2$isnearQTL))
-	SDSres2$isnearQTL <- relevel(SDSres2$isnearQTL,ref="0")
-	SDSres3$CHROMOSOME <- factor(SDSres3$CHROMOSOME,levels=unique(SDSres3$CHROMOSOME))
-	SDSres3$Bin <- factor(SDSres3$Bin,levels=unique(SDSres3$Bin))
-	SDSres2$Bin <- relevel(SDSres3$Bin,ref="1")
-	fit <- glm(sSDS ~ CHROMOSOME + Bin + isnearQTL,data=SDSres3,family=Gamma(link="inverse"))
-	pvals[j] <- anova(fitg0,fit)$"Deviance"[2]	# P-value of comparison
 }
 
-# How many permuted deviance values are greater than actual (P-value)?
-propdev <- sum(pvalA<pvals)/perms
+# Performing model fit on permutated dataset
+print("Performing model fit on permuted data")
+SDSres2$isnearQTL <- factor(SDSres2$isnearQTL,levels=unique(SDSres2$isnearQTL))
+SDSres2$isnearQTL <- relevel(SDSres2$isnearQTL,ref="0")
+SDSres3$CHROMOSOME <- factor(SDSres3$CHROMOSOME,levels=unique(SDSres3$CHROMOSOME))
+SDSres3$Bin <- factor(SDSres3$Bin,levels=unique(SDSres3$Bin))
+SDSres2$Bin <- relevel(SDSres3$Bin,ref="1")
+fit <- glm(sSDS ~ CHROMOSOME + Bin + isnearQTL,data=SDSres3,family=Gamma(link="inverse"))
+pvals <- anova(fitg0,fit)$"Deviance"[2]	# P-value of comparison
 
 # Outputting deviance values
-write.table(c(pvalA,pvals,propdev),file=paste0("OutTables/PermTest_n",perms,"_",fname,"N0_Stature_",minbr,".dat"), quote = F, row.names = F, col.names = F)
-
-# Histogram of permuted values, along with actual value
-png(paste0('OutFigures/SDS_Stature_',minbr,'_Permutations_',fname,'N0.png'),width=8,height=8,units = 'in',res=200)
-par(mar=c(5,6.5,4,1.5) + 0.1)
-maxx <- max(hist(pvals,breaks=30,plot=F)$breaks)
-nt <- 5
-while(pvalA > maxx){
-	maxx <- maxx*1.2
-	nt <- nt + 1
-}
-maxy <- max(hist(pvals,breaks=30,plot=F)$density)
-hist(pvals, breaks=30, prob=T, col=rgb(0,0,0,0.25), xlab="", ylab="", main="", xaxt="n", yaxt="n", xlim=c(0,maxx))
-axis(1, at=seq(0, maxx, maxx/nt), pos=0)
-axis(2, at=seq(0,maxy,maxy/4), las=2)
-title("Histogram of Randomised Deviance Values, Stature (QTLs in ",minbr," breeds)",xlab="Deviance Values")
-text(x=(-maxx/5),y=maxy/2,labels=paste("Density",sep="\n"),xpd=NA)
-abline(v=pvalA,lty=2,lwd=2)
-dev.off()
+write.table(c(pvalA,pvals,propdev),file=paste0("OutTables/PermTest_n",idx,"_",fname,"N0_Stature_",minbr,".dat"), quote = F, row.names = F, col.names = F)
 
 # EOF
