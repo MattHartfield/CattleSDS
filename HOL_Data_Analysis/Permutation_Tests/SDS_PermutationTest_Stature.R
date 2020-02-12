@@ -208,6 +208,6 @@ fit <- glm(sSDS ~ CHROMOSOME + Bin + isnearQTL,data=SDSres3,family=Gamma(link="i
 pvals <- anova(fitg0,fit)$"Deviance"[2]	# P-value of comparison
 
 # Outputting deviance values
-write.table(c(pvalA,pvals,propdev),file=paste0("OutTables/PermTest_n",idx,"_",fname,"N0_Stature_",minbr,".dat"), quote = F, row.names = F, col.names = F)
+write.table(c(pvalA,pvals),file=paste0("OutTables/PermTest_n",idx,"_",fname,"N0_Stature_",minbr,".dat"), quote = F, row.names = F, col.names = F)
 
 # EOF

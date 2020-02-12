@@ -54,11 +54,13 @@ alpha <- (0.05/dim(SDSres)[1])
 SigSDS <- intersect(which((SDSres[,14] < alpha)),which((as.numeric(as.character(SDSres[,9])) >= 1)))
 SDSres[SigSDS,] -> SigSDSRes
 SDS_CO <- min(SigSDSRes[,13])
+cat(paste0(dim(SigSDSRes)[1]," SNPs with Bonferroni-corrected P < 0.05\n"))
 
 # Extracting significant results considering q < 0.05 (FDR)
 SigSDS2 <- intersect(which((SDSres[,15] < 0.05)),which((as.numeric(as.character(SDSres[,9])) >= 1)))
 SDSres[SigSDS2,] -> SigSDSRes2
 SDS_CO2 <- min(SigSDSRes2[,13])
+cat(paste0(dim(SigSDSRes2)[1]," SNPs with FDR < 0.05\n"))
 
 # Plotting absolute SDS, with outlier regions
 colrs <- vector(mode="character",length=dim(SDSres)[1])
