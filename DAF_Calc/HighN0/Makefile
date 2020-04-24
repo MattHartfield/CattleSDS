@@ -11,10 +11,9 @@
 MS				=	./ms
 SIMUPOP_BACKWARD		=	./backward_wHolstein.py -m Holstein
 PRESENT_DIPLOID_POPULATION_SIZE	=	793
-PRESENT_DAF_LIST		=	YFI
-SIM_NUM_REPLICATIONS		=	10
-#sample size is number of haplotypes (as using inbred individuals)
-SAMPLE_SIZE			=	102
+PRESENT_DAF_LIST		=	DFI
+SIM_NUM_REPLICATIONS		=	1000
+SAMPLE_SIZE			=	204
 
 #####------------------------------------------------------------####
 

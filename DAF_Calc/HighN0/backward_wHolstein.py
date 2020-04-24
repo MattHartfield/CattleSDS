@@ -177,45 +177,45 @@ def baseNt_Gravel_CHB(gen):
 def baseNt_Holstein(gen):
 
     my_gen_backwards = genBackwards(gen)
-    if my_gen_backwards > 130000:
+    if my_gen_backwards >= 130000:
         return 31652
-    if my_gen_backwards > 83043:
+    if my_gen_backwards >= 83043:
         return 65485
-    if my_gen_backwards > 53045:
+    if my_gen_backwards >= 53045:
         return 86207
-    if my_gen_backwards > 33882:
+    if my_gen_backwards >= 33882:
         return 79079
-    if my_gen_backwards > 21639:
+    if my_gen_backwards >= 21639:
         return 71209
-    if my_gen_backwards > 13818:
+    if my_gen_backwards >= 13818:
         return 72842
-    if my_gen_backwards > 8821:
+    if my_gen_backwards >= 8821:
         return 63092
-    if my_gen_backwards > 5629:
+    if my_gen_backwards >= 5629:
         return 52882
-    if my_gen_backwards > 3590:
+    if my_gen_backwards >= 3590:
         return 50726
-    if my_gen_backwards > 2288:
+    if my_gen_backwards >= 2288:
         return 36513
-    if my_gen_backwards > 1455:
+    if my_gen_backwards >= 1455:
         return 27155
-    if my_gen_backwards > 924:
+    if my_gen_backwards >= 924:
         return 23783
-    if my_gen_backwards > 584:
+    if my_gen_backwards >= 584:
         return 20160
-    if my_gen_backwards > 367:
+    if my_gen_backwards >= 367:
         return 15603
-    if my_gen_backwards > 229:
+    if my_gen_backwards >= 229:
         return 11367
-    if my_gen_backwards > 140:
+    if my_gen_backwards >= 140:
         return 6909
-    if my_gen_backwards > 83:
+    if my_gen_backwards >= 83:
         return 3892
-    if my_gen_backwards > 47:
+    if my_gen_backwards >= 47:
         return 1815
-    if my_gen_backwards > 24:
+    if my_gen_backwards >= 24:
         return 1320
-    if my_gen_backwards > 9:
+    if my_gen_backwards >= 9:
         return 1077
     if my_gen_backwards >= 1:
         return 793
@@ -225,45 +225,45 @@ def baseNt_Holstein(gen):
 def baseNt_HolsteinLowN0(gen):
 
     my_gen_backwards = genBackwards(gen)
-    if my_gen_backwards > 130000:
+    if my_gen_backwards >= 130000:
         return 31652
-    if my_gen_backwards > 83043:
+    if my_gen_backwards >= 83043:
         return 65485
-    if my_gen_backwards > 53045:
+    if my_gen_backwards >= 53045:
         return 86207
-    if my_gen_backwards > 33882:
+    if my_gen_backwards >= 33882:
         return 79079
-    if my_gen_backwards > 21639:
+    if my_gen_backwards >= 21639:
         return 71209
-    if my_gen_backwards > 13818:
+    if my_gen_backwards >= 13818:
         return 72842
-    if my_gen_backwards > 8821:
+    if my_gen_backwards >= 8821:
         return 63092
-    if my_gen_backwards > 5629:
+    if my_gen_backwards >= 5629:
         return 52882
-    if my_gen_backwards > 3590:
+    if my_gen_backwards >= 3590:
         return 50726
-    if my_gen_backwards > 2288:
+    if my_gen_backwards >= 2288:
         return 36513
-    if my_gen_backwards > 1455:
+    if my_gen_backwards >= 1455:
         return 27155
-    if my_gen_backwards > 924:
+    if my_gen_backwards >= 924:
         return 23783
-    if my_gen_backwards > 584:
+    if my_gen_backwards >= 584:
         return 20160
-    if my_gen_backwards > 367:
+    if my_gen_backwards >= 367:
         return 15603
-    if my_gen_backwards > 229:
+    if my_gen_backwards >= 229:
         return 11367
-    if my_gen_backwards > 140:
+    if my_gen_backwards >= 140:
         return 6909
-    if my_gen_backwards > 83:
+    if my_gen_backwards >= 83:
         return 3892
-    if my_gen_backwards > 47:
+    if my_gen_backwards >= 47:
         return 1815
-    if my_gen_backwards > 24:
+    if my_gen_backwards >= 24:
         return 1320
-    if my_gen_backwards > 9:
+    if my_gen_backwards >= 9:
         return 1077
     if my_gen_backwards >= 1:
         return 49

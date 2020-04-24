@@ -101,8 +101,7 @@ dev.off()
 
 ## Part 2: Are any high SDS scores within milk-producing regions?
 # Reading in and classifying milk-producing regions
-# From milk-protein gene set (additional data file 2 from Lemay et al 2009 Genome Biology)
-milky <- read.table("Milk_Protein_Genes_Sept19/milk_protein_names_conv_Sept19.bed",skip=1)[,1:3] # Only including gene locations and autosomal genes
+milky <- read.table("Milk_Protein_Genes/milk_protein_names.bed",skip=1)[,1:3] # Only including gene locations and autosomal genes
 names(milky) <- c("chrom","chromStart","chromEnd")
 milky$chrom <- factor(milky$chrom, levels=unique(SDSres$CHROMOSOME))
 sigmilk <- vector(mode="numeric",length=0)
@@ -157,9 +156,6 @@ SDSres2 <- SDSres[!(row.names(SDSres)%in%row.names(SigSDSRes)),]
 row.names(SDSres2) <- c(1:dim(SDSres2)[1])
 SDSres2$CHROMOSOME = factor(SDSres2$CHROMOSOME,levels=orderedChr)
 
-# Has masking worked? Should give integer(0)
-intersect(which((SDSres2[,14] < alpha)),which((as.numeric(as.character(SDSres2[,9])) >= 1)))
-
 ## Part 3: including milk-gene as a factor. Putting scores in bins, determining effect of milk on SDS.
 
 # Classifying milk-producing regions
@@ -194,27 +190,7 @@ hist(MilkSDS, breaks=30, prob=T, col=rgb(0,0,1,0.5), add=T)
 legend("topright", legend=c("All regions", "Milk Protein Genes"),col=c(rgb(1,0,0,0.5), rgb(0,0,1,0.5)),lwd=10)
 dev.off()
 
-# Now loading in recombination data for use in model comparison
-# Loading in recmap data
-# Commented out - not using for now (based on old assembly)
-# recmaps <- read.csv("RecMaps/LRR_Belen/local_recomb_rate_per_bin_NEW.txt",head=F)
-# colnames(recmaps) <- c("chr","bin","begin","end","mid", "cMperMb")
-# recmaps <- recmaps[!is.na(recmaps$cMperMb),]	# excluding bins with no LRR estimated
-
-# For each chromosome:
-# (1) Predict local rec rate using cubic formulae
-# (2) Use these to fill in rec rates
-# for(i in unique(cno)){
-	# rmc <- subset(recmaps,chr==i)
-	# mfit <- lm(cMperMb ~ mid + I(mid^2) + I(mid^3),data=rmc)
-	# prec <- predict(mfit,list(mid=subset(SDSres2,CHROMOSOME==paste0("Chr",i))$POS))
-	# td <- row.names(SDSres2)%in%row.names(subset(SDSres2,CHROMOSOME==paste0("Chr",i)))
-	# SDSres2[td,17] <- prec
-# }
-# names(SDSres2)[17] <- "Rec"
-# SDSres2$Rec <- as.numeric(SDSres2$Rec)
-
-# General Linear model fit, comparing milk and non-milk regions, Gamma link function. Takes a few minutes to run for each model fit
+# General Linear model fit, comparing milk and non-milk regions, Gamma link function.
 SDSres2$CHROMOSOME <- factor(SDSres2$CHROMOSOME,levels=unique(SDSres2$CHROMOSOME))
 SDSres2$Bin <- factor(SDSres2$Bin,levels=unique(SDSres2$Bin))
 SDSres2$Bin <- relevel(SDSres2$Bin,ref="1")
@@ -229,26 +205,8 @@ summary(fitg)
 anova(fitg0,fitg,test="Chisq")
 sink()
 
-# Part 3a: Are milk regions enriched for high SDS scores (as determined by FDR < 0.05)?
-
-fdrc <- 0.05
-MS <- dim(subset(subset(SDSres2,qSDS<fdrc),Milk==1))[1]
-MNS <- dim(subset(subset(SDSres2,qSDS>=fdrc),Milk==1))[1]
-NMS <- dim(subset(subset(SDSres2,qSDS<fdrc),Milk==0))[1]
-NMNS <- dim(subset(subset(SDSres2,qSDS>=fdrc),Milk==0))[1]
-
-paste0("FDR < ",fdrc)
-testdat <- matrix(c(MS, MNS , NMS, NMNS), nrow = 2, dimnames = list(c(paste0("FDR < ",fdrc), paste0("FDR >= ",fdrc)), c("Milk", "Not Milk")))
-fisher.test(testdat, alternative = "greater")
-
-# Print summary to file
-sink(paste0("OutTables/Milk_FisherTest_Summary_",fname,"N0.txt"))
-testdat
-fisher.test(testdat, alternative = "greater")
-sink()
-
-## Part 3b: Look at absolute SDS within each milk-gene region, see which areas are outliers
-mpnames <- read.csv("Milk_Protein_Genes_Sept19/milk_protein_names_conv_Sept19.csv")
+## Look at absolute SDS within each milk-gene region, see which areas are outliers
+mpnames <- read.csv("Milk_Protein_Genes/milk_protein_names.csv")
 mpnames$chrom <- factor(mpnames$chrom, levels=unique(SDSres$CHROMOSOME))
 mreg <- list()
 idx <- 1
@@ -271,7 +229,7 @@ for(i in unique(SDSres2$CHROMOSOME)){
 mreg <- mreg[unlist(lapply(mreg,function(x) length(x)!=0))]	# Removing empty SDS scores
 
 ## Plotting comparisons of only the significantly high ones (P = 0.05, bonferroni-corrected)
-pvs <- unlist(lapply(mreg,function(x) wilcox.test(x,mu=sqrt(2/pi),alternative="greater")$p.value))
+pvs <- unlist(lapply(mreg,function(x) wilcox.test(jitter(x),mu=sqrt(2/pi),alternative="greater")$p.value))
 ms <- unlist(lapply(mreg,function(x) mean(x,na.rm=T)))
 ms2 <- unlist(lapply(mreg,function(x) median(x,na.rm=T)))
 pt <- data.frame(cbind(pvs[which(pvs < 0.05/length(pvs))],which(pvs < 0.05/length(pvs)),ms[which(pvs < 0.05/length(pvs))],ms2[which(pvs < 0.05/length(pvs))]))
@@ -297,7 +255,7 @@ write.csv(mpsig,file=paste0("OutTables/HighSDSMilk_",fname,"N0.csv"),quote=F,row
 
 # Part 4: Reading in Stature QTL data. First where effect sizes estimated in 6 of 7 Holstein
 # These QTLs have positions relative to old assembly (UMD)
-milkQTL <- readRDS("QTLMilkDat/curated_stature_snps_6.rds")
+milkQTL <- readRDS("QTLStatureDat/curated_stature_snps_6.rds")
 QTLi <- noquote(matrix(data=unlist(strsplit(milkQTL$position,":")),nrow=dim(milkQTL)[1],ncol=2,byrow=T))
 QTLi <- data.frame(CHROMOSOME=QTLi[,1],POS=QTLi[,2],milkQTL[,2])
 names(QTLi)[3] <- "EFFECT"
@@ -307,8 +265,8 @@ QTLi$POS <- as.numeric(QTLi$POS)
 QTLi$EFFECT <- as.numeric(QTLi$EFFECT)
 
 # Obtaining new QTL positions in ARS-UCD assembly
-nQTL <- read.table("StatureQTLs_Dec19/securenew.qtl",head=T)		 		# 'Secure' QTLs
-nQTLn <- read.table("StatureQTLs_Dec19/nonsecurenew_edit.qtl",head=T)	 	# 'Nonsecure' QTLs (previously edited to only keep 'OK' ones)
+nQTL <- read.table("StatureQTLs/securenew.qtl",head=T)		 		# 'Secure' QTLs
+nQTLn <- read.table("StatureQTLs/nonsecurenew.qtl",head=T)	 		# 'Nonsecure' QTLs
 nQTL <- rbind(nQTL,nQTLn[,c(1:3,5)])
 nQTL <- nQTL[order(nQTL$UMDChr, nQTL$UMDPos),]
 nQTL$UMDChr <- paste("Chr",nQTL$UMDChr,sep="")
@@ -377,27 +335,9 @@ summary(fitgQ)
 anova(fitg0,fitgQ,test="Chisq")
 sink()
 
-# Are stature QTLs enriched for high SDS scores?
-
-fdrc <- 0.05
-MS <- dim(subset(subset(SDSres2,qSDS<fdrc),isnearQTL==1))[1]
-MNS <- dim(subset(subset(SDSres2,qSDS>=fdrc),isnearQTL==1))[1]
-NMS <- dim(subset(subset(SDSres2,qSDS<fdrc),isnearQTL==0))[1]
-NMNS <- dim(subset(subset(SDSres2,qSDS>=fdrc),isnearQTL==0))[1]
-
-paste0("FDR < ",fdrc)
-testdat <- matrix(c(MS, MNS , NMS, NMNS), nrow = 2, dimnames = list(c(paste0("FDR < ",fdrc), paste0("FDR >= ",fdrc)), c("Milk QTL Region", "Not Milk QTL Region")))
-fisher.test(testdat, alternative = "greater")
-
-# Print summary to file
-sink(paste0("OutTables/Stature_6_FisherTest_Summary_",fname,"N0.txt"))
-testdat
-fisher.test(testdat, alternative = "greater")
-sink()
-
 # Part 4a: Repeating for QTLs with effect sizes in at least 5 of 7 Holstein
 # Original co-ordinates in UMD assembly
-milkQTL <- readRDS("QTLMilkDat/curated_stature_snps_5.rds")
+milkQTL <- readRDS("QTLStatureDat/curated_stature_snps_5.rds")
 QTLi <- noquote(matrix(data=unlist(strsplit(milkQTL$position,":")),nrow=dim(milkQTL)[1],ncol=2,byrow=T))
 QTLi <- data.frame(CHROMOSOME=QTLi[,1],POS=QTLi[,2],milkQTL[,2])
 names(QTLi)[3] <- "EFFECT"
@@ -460,24 +400,6 @@ sink(file=paste0("OutTables/Stature_GLM_Summary_5_",fname,"N0.txt"))
 cat(paste0("Number of QTL initially ",nQ,"; with SNP effects assigned, ",nQ2,"\n"))
 summary(fitgQ)
 anova(fitg0,fitgQ,test="Chisq")
-sink()
-
-# Are stature QTLs enriched for high SDS scores?
-
-fdrc <- 0.05
-MS <- dim(subset(subset(SDSres2,qSDS<fdrc),isnearQTL==1))[1]
-MNS <- dim(subset(subset(SDSres2,qSDS>=fdrc),isnearQTL==1))[1]
-NMS <- dim(subset(subset(SDSres2,qSDS<fdrc),isnearQTL==0))[1]
-NMNS <- dim(subset(subset(SDSres2,qSDS>=fdrc),isnearQTL==0))[1]
-
-paste0("FDR < ",fdrc)
-testdat <- matrix(c(MS, MNS , NMS, NMNS), nrow = 2, dimnames = list(c(paste0("FDR < ",fdrc), paste0("FDR >= ",fdrc)), c("Milk QTL Region", "Not Milk QTL Region")))
-fisher.test(testdat, alternative = "greater")
-
-# Print summary to file
-sink(paste0("OutTables/Stature_5_FisherTest_Summary_",fname,"N0.txt"))
-testdat
-fisher.test(testdat, alternative = "greater")
 sink()
 
 # EOF

@@ -16,12 +16,12 @@ for ((i=0; i<NDAF; i++));
 do
 	mkdir GSF${DAFS[${i}]}
 	cp Makefile ms backward_wHolstein.py GSF${DAFS[${i}]}/
-	sed -i -e "s/YFI/${DAFS[${i}]}/" GSF${DAFS[${i}]}/Makefile
+	sed -i -e "s/DFI/${DAFS[${i}]}/" GSF${DAFS[${i}]}/Makefile
 	echo '#!/bin/bash' > GS${i}.sh
 	echo '#SBATCH -c 1' >> GS${i}.sh
 	echo '#SBATCH --mem-per-cpu 256' >> GS${i}.sh
 	echo '#SBATCH --partition normal' >> GS${i}.sh
-	echo '#SBATCH --time=20:00:00' >> GS${i}.sh
+	echo '#SBATCH --time=30:00:00' >> GS${i}.sh
 	echo . /home/mhart/miniconda3/etc/profile.d/conda.sh >> GS${i}.sh
 	echo 'conda activate simupop-env' >> GS${i}.sh
 	echo 'make sim &' >> GS${i}.sh

@@ -87,14 +87,9 @@ SDSres2 <- SDSres[!(row.names(SDSres)%in%row.names(SigSDSRes)),]
 row.names(SDSres2) <- c(1:dim(SDSres2)[1])
 SDSres2$CHROMOSOME = factor(SDSres2$CHROMOSOME,levels=orderedChr)
 
-# Has masking worked? Should give integer(0)
-print("If masking worked then should produce integer(0):")
-intersect(which((SDSres2[,14] < alpha)),which((as.numeric(as.character(SDSres2[,9])) >= 1)))
-
 # Reading in and classifying milk-producing regions
-# From milk-protein gene set (additional data file 2 from Lemay et al 2009 Genome Biology)
 # Then including milk-gene as a factor. Putting scores in bins, determining effect of milk on SDS.
-milky <- read.table("milk_protein_names_conv_Sept19.bed",skip=1)[,1:3] # Only including gene locations and autosomal genes
+milky <- read.table("milk_protein_names.bed",skip=1)[,1:3] # Only including gene locations and autosomal genes
 names(milky) <- c("chrom","chromStart","chromEnd")
 milky$chrom <- factor(milky$chrom, levels=unique(SDSres$CHROMOSOME))
 milkreg <- vector(mode="numeric",length=0)
@@ -131,7 +126,7 @@ SDSres2[row.names(SDSres2)%in%milkreg,16] <- 1
 SDSres2[!(row.names(SDSres2)%in%milkreg),16] <- 0
 SDSres2$Milk <- factor(SDSres2$Milk,levels=unique(SDSres2$Milk))
 
-# General Linear model fit, comparing milk and non-milk regions, Gamma link function. Takes a few minutes to run for each model fit
+# General Linear model fit, comparing milk and non-milk regions, Gamma link function.
 SDSres2$CHROMOSOME <- factor(SDSres2$CHROMOSOME,levels=unique(SDSres2$CHROMOSOME))
 SDSres2$Bin <- factor(SDSres2$Bin,levels=unique(SDSres2$Bin))
 SDSres2$Bin <- relevel(SDSres2$Bin,ref="1")
@@ -149,7 +144,7 @@ if(idx == 1){
 	sink()
 }
 
-# Now permutation analyses	
+# Permutation analyses	
 corrfac <- vector(mode="numeric",length=length(cno))
 names(corrfac) <- factor(orderedChr)
 

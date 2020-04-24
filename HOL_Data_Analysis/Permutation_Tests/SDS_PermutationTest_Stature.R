@@ -88,10 +88,6 @@ SDSres2 <- SDSres[!(row.names(SDSres)%in%row.names(SigSDSRes)),]
 row.names(SDSres2) <- c(1:dim(SDSres2)[1])
 SDSres2$CHROMOSOME = factor(SDSres2$CHROMOSOME,levels=orderedChr)
 
-# Has masking worked? Should give integer(0)
-print("If masking worked then should produce integer(0):")
-intersect(which((SDSres2[,14] < alpha)),which((as.numeric(as.character(SDSres2[,9])) >= 1)))
-
 # Reading in Stature QTL data. These QTLs have positions relative to old assembly (UMD)
 milkQTL <- readRDS(paste0("curated_stature_snps_",minbr,".rds"))
 QTLi <- noquote(matrix(data=unlist(strsplit(milkQTL$position,":")),nrow=dim(milkQTL)[1],ncol=2,byrow=T))
@@ -104,7 +100,7 @@ QTLi$EFFECT <- as.numeric(QTLi$EFFECT)
 
 # Obtaining new QTL positions in ARS-UCD assembly
 nQTL <- read.table("securenew.qtl",head=T)		 		# 'Secure' QTLs
-nQTLn <- read.table("nonsecurenew_edit.qtl",head=T)	 	# 'Nonsecure' QTLs (previously edited to only keep 'OK' ones)
+nQTLn <- read.table("nonsecurenew.qtl",head=T)	 		# 'Nonsecure' QTLs
 nQTL <- rbind(nQTL,nQTLn[,c(1:3,5)])
 nQTL <- nQTL[order(nQTL$UMDChr, nQTL$UMDPos),]
 nQTL$UMDChr <- paste("Chr",nQTL$UMDChr,sep="")
