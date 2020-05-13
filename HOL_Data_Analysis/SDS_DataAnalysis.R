@@ -176,6 +176,7 @@ SDSres2[!(row.names(SDSres2)%in%milkreg),16] <- 0
 SDSres2$Milk <- factor(SDSres2$Milk,levels=unique(SDSres2$Milk))
 
 # Plotting histogram of sSDS (red) with milk histogram on top (blue)
+# Acknowledgement for overlapping histograms: https://www.r-bloggers.com/overlapping-histogram-in-r/
 MilkSDS <- subset(SDSres2,Milk==1)$sSDS
 maxx <- ceiling(max(hist(SDSres2$sSDS, breaks=30, plot=F)$breaks))
 maxy <- max(max(hist(MilkSDS, breaks=30, plot=F)$density),max(hist(SDSres2$sSDS, breaks=30, plot=F)$density))
@@ -204,54 +205,6 @@ sink(file=paste0("OutTables/Milk_GLM_Summary_",fname,"N0.txt"))
 summary(fitg)
 anova(fitg0,fitg,test="Chisq")
 sink()
-
-## Look at absolute SDS within each milk-gene region, see which areas are outliers
-mpnames <- read.csv("Milk_Protein_Genes/milk_protein_names.csv")
-mpnames$chrom <- factor(mpnames$chrom, levels=unique(SDSres$CHROMOSOME))
-mreg <- list()
-idx <- 1
-for(i in unique(SDSres2$CHROMOSOME)){
-	hpss <- as.matrix(subset(milky,chrom==i)[2:3])
-	hpnames <- as.matrix(subset(mpnames,chrom==i)[1])
-	SDST <- subset(SDSres2,CHROMOSOME==i)
-	milkreg2 <- apply(hpss,1,function(x) row.names(SDST[intersect(which(SDST[SDST$CHROMOSOME==i,5] >= x[1]), which(SDST[SDST$CHROMOSOME==i,5] <= x[2])),]))
-	if(dim(hpss)[1] == 1){
-		mreg[[idx]] <- SDSres2[row.names(SDSres2)%in%milkreg2,13]
-		names(mreg)[idx] <- hpnames[1]
-		idx <- idx + 1
-	}else if((dim(hpss)[1] > 1) && (length(milkreg2) != 0)){
-		numreg <- dim(hpss)[1]
-		mreg[idx:(idx+numreg-1)] <- lapply(milkreg2,function(x) SDSres2[row.names(SDSres2)%in%x,13])
-		names(mreg)[idx:(idx+numreg-1)] <- hpnames
-		idx <- idx + numreg
-	}
-}
-mreg <- mreg[unlist(lapply(mreg,function(x) length(x)!=0))]	# Removing empty SDS scores
-
-## Plotting comparisons of only the significantly high ones (P = 0.05, bonferroni-corrected)
-pvs <- unlist(lapply(mreg,function(x) wilcox.test(jitter(x),mu=sqrt(2/pi),alternative="greater")$p.value))
-ms <- unlist(lapply(mreg,function(x) mean(x,na.rm=T)))
-ms2 <- unlist(lapply(mreg,function(x) median(x,na.rm=T)))
-pt <- data.frame(cbind(pvs[which(pvs < 0.05/length(pvs))],which(pvs < 0.05/length(pvs)),ms[which(pvs < 0.05/length(pvs))],ms2[which(pvs < 0.05/length(pvs))]))
-mreg2 <- mreg[pt[order(pt$X1),2]]
-
-lth <- 4.5
-png(paste0('OutFigures/SDS_ByGene_Outliers_',fname,'N0.png'),width=lth*(1+sqrt(5)),height=2*lth,units = 'in',res=200)
-par(mar=c(5,7.5,2,1))
-boxplot(mreg2,border=c(rep("black",(length(mreg2)))),ylim=c(0,4),las=0,yaxt="n",xlab="Gene Names",cex.axis=0.9)
-axis(2, at=c(0:5), las=2)
-text(x=-0.85,y=2,labels=paste("Absolute","Standardised","SDS",sep="\n"),xpd=NA)
-title("Milk protein genes with significantly elevated SDS")
-abline(h=sqrt(2/pi),lwd=2,lty=2,col="gray60")
-dev.off()
-
-# Print off table of genes with significantly high mean SDS
-mpsig <- mpnames[mpnames$name%in%names(mreg2),]
-mpsig <- mpsig[order(mpsig$chrom),]
-mpsig <- cbind(mpsig[,2],mpsig[,1],mpsig[,3:4])
-mpsig[,1] <- as.double(unlist(strsplit(as.character(mpsig[,1]),"r"))[seq(2,2*dim(mpsig)[1],2)])
-names(mpsig) <- c("Chromosome","Gene Name","Start Position","End Position")
-write.csv(mpsig,file=paste0("OutTables/HighSDSMilk_",fname,"N0.csv"),quote=F,row.names=F)
 
 # Part 4: Reading in Stature QTL data. First where effect sizes estimated in 6 of 7 Holstein
 # These QTLs have positions relative to old assembly (UMD)

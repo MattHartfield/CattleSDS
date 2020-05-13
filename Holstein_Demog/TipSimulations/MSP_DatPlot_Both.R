@@ -37,7 +37,7 @@ xy.error.bars <- function(x,y,ybot,ytop,xin,xt,yt){
 	xout <- round(xyll(xin,dfit$coefficients[1],dfit$coefficients[2]))
 	segments(xin,min(y-ybot)/2,xin,xout,lty=2)
 	segments(min(x)/2,xout,xin,xout,lty=2)
-	text(xt,yt,sprintf("%d samples covers %d generations",xin,xout))
+	text(xt,yt,sprintf("%d alleles covers %d generations",xin,xout))
 }
 
 dat <- read.table("MSP_Results.dat")
