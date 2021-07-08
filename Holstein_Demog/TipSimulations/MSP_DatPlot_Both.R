@@ -25,7 +25,7 @@ xy.error.bars <- function(x,y,ybot,ytop,xin,xt,yt){
 	dfit <- lm(log(y)~log(x))
 	dpred <- predict(dfit)
 	par(mar=c(5,7,4,2)+0.1)
-	plot(x, y, pch=16, ylim=c(min(y-ybot),max(y+ytop)),log="xy",xlab="Number of alleles in tree",ylab="",xaxt="n",yaxt="n")
+	plot(x, y, pch=16, ylim=c(min(y-ybot),max(y+ytop)),log="xy",xlab="Haploid Sample Size",ylab="",xaxt="n",yaxt="n")
 	axis(1,at=c(10,20,50,100,250,500,1000))
 	axis(2,at=c(10,50,100,500,1000,5000,10000),las=2)
 	ymx <- max(y+ytop)
@@ -37,7 +37,7 @@ xy.error.bars <- function(x,y,ybot,ytop,xin,xt,yt){
 	xout <- round(xyll(xin,dfit$coefficients[1],dfit$coefficients[2]))
 	segments(xin,min(y-ybot)/2,xin,xout,lty=2)
 	segments(min(x)/2,xout,xin,xout,lty=2)
-	text(xt,yt,sprintf("%d alleles covers %d generations",xin,xout))
+	text(xt,yt,sprintf("%d samples covers %d generations",xin,xout))
 }
 
 dat <- read.table("MSP_Results.dat")

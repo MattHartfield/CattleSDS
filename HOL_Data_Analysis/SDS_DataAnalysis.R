@@ -11,18 +11,174 @@ if(ind == 1){
 	fname <- "High"
 }else if(ind == 2){
 	fname <- "Low"
+}else{
+	cat("Input command needs to be 1 or 2. Exiting.\n")
+	quit(status=1)
+}
+cat("Analysing",fname,"N0 data\n")
+
+# Function for finding nearest position to QTL, polarising. Milk QTLs
+QTLpol <- function(milkfQTL,SDSres2)
+{
+	# Replacing position, chromosome with ARS-UCD versions
+	milkfQTL$pos <- unlist(strsplit(milkfQTL$`ARS-UCD2.1`,":"))[seq(2,dim(milkfQTL)[1]*2,2)]
+	milkfQTL$chr <- chartr("c","C",unlist(strsplit(milkfQTL$`ARS-UCD2.1`,":"))[seq(1,(dim(milkfQTL)[1]*2-1),2)])
+	milkfQTL$chr <- factor(milkfQTL$chr,levels=orderedChr)
+	milkfQTL$pos <- as.numeric(milkfQTL$pos)
+
+	# Reading in table of allele polarisation
+	apol <- read.table(paste0("SDSAll_Polarisation.dat"),header=T)
+	apol$CHROMOSOME = factor(apol$CHROMOSOME,levels=orderedChr)
+
+	# Finding nearest SNP to each QTL, obtaining SDS score
+	QTLmfs <- data.frame(CHROMOSOME=character(),POS=numeric(),sSDS=numeric(),Bin=numeric(),NotRef=numeric(),p=numeric(),German_Holstein=character(),NegEff=numeric())
+	QTLmfpos <- vector(mode="numeric",length=0) # Distance to nearest SNP
+	for(i in unique(SDSres2$CHROMOSOME)){
+		SDST <- subset(SDSres2,CHROMOSOME==i)
+		bounds <- c(min(SDST$POS),max(SDST$POS))
+		QTLT <- subset(milkfQTL,chr==i)
+		QTLT <- QTLT[((QTLT$pos>=bounds[1])+(QTLT$pos<=bounds[2]) == 2),] 	# Removing QTLs that lie in telomeric regions
+		QTLT <- QTLT[!(apply(QTLT,1,function(x) SDST[which(abs(SDST$POS-as.numeric(x[3]))==min(abs(SDST$POS-as.numeric(x[3])))),5])%in%bounds),]		# Removing QTLs where nearest SNP is at edge of range
+		PT <- apply(QTLT,1,function(x) SDST[which(abs(SDST$POS-as.numeric(x[3]))==min(abs(SDST$POS-as.numeric(x[3])))),5])
+		QTLmfpos <- c(QTLmfpos,abs(PT-QTLT$pos))
+		QTLmfsT <- SDST[SDST$POS%in%PT,c(1,5,13,12)]
+		if(dim(QTLmfsT)[1]>0)
+		{
+			# Finding QTLs where REF!=ANC, switching signs
+			QTLmfsT <- cbind(QTLmfsT,0)
+			names(QTLmfsT)[5] <- "NotRef"
+			apT <- filter(apol,CHROMOSOME==i,POS%in%PT,ANC!=REF)
+			QTLmfsT[QTLmfsT$POS%in%apT$POS,5] <- 1
+			QTLmfsT[QTLmfsT$POS%in%apT$POS,3] <- ifelse(QTLmfsT[QTLmfsT$POS%in%apT$POS,3]<0,abs(QTLmfsT[QTLmfsT$POS%in%apT$POS,3]),(-1)*(QTLmfsT[QTLmfsT$POS%in%apT$POS,3]))
+			# Then polarising by QTL effect
+			QTLmfsT <- cbind(QTLmfsT,abs(log10(QTLT[,5])),QTLT[,7],0)
+			names(QTLmfsT)[8] <- "NegEff"
+			for(j in 1:dim(QTLmfsT)[1])
+			{
+				# If negative effect size, swap sign of SDS score
+				if(QTLmfsT[j,7]=="-")
+				{
+					QTLmfsT[j,8] <- 1
+					if(QTLmfsT[j,3]>0)
+					{
+						QTLmfsT[j,3] <- (-1)*(QTLmfsT[j,3])
+					}else{
+						QTLmfsT[j,3] <- abs(QTLmfsT[j,3])
+					}
+				}
+			}
+			QTLmfs <- rbind(QTLmfs,QTLmfsT)
+		}
+	}
+	
+	outv <- list("Distances"=QTLmfpos,"Values"=QTLmfs)
+	return(outv)
+	
 }
 
-# Half-Normal CDF (for calculating P-values)
-erf <- function(x) 2 * pnorm(x * sqrt(2)) - 1
-fncdf <- function(x){
-	ifelse(x < 0, 0,  erf(x/sqrt(2)))
-}
-fnP <- function(x){
-	1-fncdf(x)
+# Function for finding nearest position to QTL, polarising. Stature QTLs
+QTLspol <- function(statQTL6,SDSres2)
+{
+	QTLi <- noquote(matrix(data=unlist(strsplit(statQTL6$position,":")),nrow=dim(statQTL6)[1],ncol=2,byrow=T))
+	QTLi <- data.frame(CHROMOSOME=QTLi[,1],POS=QTLi[,2],statQTL6[,c(2,3,8)])
+	names(QTLi)[3] <- "EFFECT"
+	names(QTLi)[4] <- "p"
+	names(QTLi)[5] <- "QTLAncestral"
+	QTLi <- QTLi[QTLi$CHROMOSOME!="Chr25",]
+	QTLi$CHROMOSOME <- factor(QTLi$CHROMOSOME,levels=orderedChr)
+	QTLi$POS <- as.numeric(QTLi$POS)
+	QTLi$EFFECT <- as.numeric(QTLi$EFFECT)
+	QTLi$p <- as.numeric(QTLi$p)
+	QTLi$QTLAncestral <- as.character(QTLi$QTLAncestral)
+
+	# Obtaining new QTL positions in ARS-UCD assembly
+	nQTL <- read.table("StatureQTLs/securenew.qtl",head=T)		 		# 'Secure' QTLs
+	nQTLn <- read.table("StatureQTLs/nonsecurenew.qtl",head=T)	 		# 'Nonsecure' QTLs
+	nQTL <- rbind(nQTL,nQTLn[,c(1:3,5)])
+	nQTL <- nQTL[order(nQTL$UMDChr, nQTL$UMDPos),]
+	nQTL$UMDChr <- paste("Chr",nQTL$UMDChr,sep="")
+	nQTL$ARSChr <- paste("Chr",nQTL$ARSChr,sep="")
+	nQTL <- nQTL[nQTL$UMDChr!="Chr25",]
+	nQTL$UMDChr <- factor(nQTL$UMDChr,levels=orderedChr)
+	nQTL$ARSChr <- factor(nQTL$ARSChr,levels=orderedChr)
+	row.names(nQTL) <- c(1:dim(nQTL)[1])
+
+	# Now matching old positions to new ones
+	nidx <- match(QTLi$POS,nQTL$UMDPos)								# Finding new positions in lookup table
+	QTLi <- cbind(QTLi,nQTL[nidx,c(3,4)])
+	QTLi <- QTLi[!is.na(QTLi$ARSPos),]
+	QTLi <- QTLi[QTLi$CHROMOSOME==QTLi$ARSChr,]
+	QTLi$POS <- QTLi$ARSPos
+	QTLi <- QTLi[,1:5]
+	
+	# Initial number of QTL (excluding Chr 25)
+	nQ <- dim(QTLi)[1];nQ
+	
+	# Reading in table of allele polarisation
+	apol <- read.table(paste0("SDSAll_Polarisation.dat"),header=T)
+	apol$CHROMOSOME = factor(apol$CHROMOSOME,levels=orderedChr)
+	
+	# Finding nearest SNP to each QTL
+	QTLsts <- data.frame(CHROMOSOME=character(),POS=numeric(),sSDS=numeric(),Bin=numeric(),QTLAncestral=character(),ANC=character(),NotRef=numeric(),EFFECT=numeric(),p=numeric(),NegEff=numeric())
+	QTLsts2 <- data.frame(CHROMOSOME=character(),POS=numeric(),sSDS=numeric(),Bin=numeric(),QTLAncestral=character(),ANC=character(),NotRef=numeric(),EFFECT=numeric(),p=numeric(),NegEff=numeric())
+	QTLspos <- vector(mode="numeric",length=0) # Distance to nearest SNP
+	for(i in unique(SDSres2$CHROMOSOME)){
+		SDST <- subset(SDSres2,CHROMOSOME==i)
+		bounds <- c(min(SDST $POS),max(SDST$POS))
+		QTLT <- subset(QTLi,CHROMOSOME==i)
+		QTLT <- QTLT[((QTLT$POS>=bounds[1])+(QTLT$POS<=bounds[2]) == 2),] 	# Removing QTLs that lie in telomeric regions
+		QTLT <- QTLT[!(apply(QTLT,1,function(x) SDST[which(abs(SDST$POS-as.numeric(x[2]))==min(abs(SDST$POS-as.numeric(x[2])))),5])%in%bounds),]	# Removing QTLs where nearest SNP is at edge of range
+		PT <- apply(QTLT,1,function(x) SDST[which(abs(SDST$POS-as.numeric(x[2]))==min(abs(SDST$POS-as.numeric(x[2])))),5])
+		if(length(PT)>0)
+		{
+			QTLspos <- c(QTLspos,abs(PT-QTLT$POS))
+			# Now forming table of nearest SDS scores, along with ancestral allele calls
+			PT2 <- apply(QTLT,1,function(x) c(SDST[which(abs(SDST$POS-as.numeric(x[2]))==min(abs(SDST$POS-as.numeric(x[2])))),5],x[5]))
+			PT2 <- as.data.frame(t(PT2))
+			names(PT2)[1] <- "POS"
+			PT2$POS <- as.numeric(as.character(PT2$POS))
+			PT3 <- SDST[SDST$POS%in%PT,c(1,5,13,12)]
+			PT4 <- filter(apol,CHROMOSOME==i,POS%in%PT)[,2:3]
+			PT5 <- inner_join(PT3,PT2,by="POS") %>% inner_join(PT4,by="POS")
+
+			# Finding QTLs where REF!=ANC, switching signs
+			apT <- filter(apol,CHROMOSOME==i,POS%in%PT,ANC!=REF)
+			PT5 <- cbind(PT5,0)
+			names(PT5)[7] <- "NotRef"
+			PT5[PT5$POS%in%apT$POS,7] <- 1
+			PT5[PT5$POS%in%apT$POS,3] <- ifelse(PT5[PT5$POS%in%apT$POS,3]<0,abs(PT5[PT5$POS%in%apT$POS,3]),(-1)*(PT5[PT5$POS%in%apT$POS,3]))
+			# Then polarising by QTL effect
+			PT5 <- cbind(PT5,QTLT[,3],abs(log10(QTLT[,4])),0)
+			names(PT5)[8] <- "EFFECT"
+			names(PT5)[9] <- "p"
+			names(PT5)[10] <- "NegEff"
+			for(j in 1:dim(PT5)[1])
+			{
+				# If negative effect size, swap sign of SDS score
+				if(PT5[j,8]<0)
+				{
+					PT5[j,10] <- 1
+					if(PT5[j,3]>0)
+					{
+						PT5[j,3] <- (-1)*(PT5[j,3])
+					}else{
+						PT5[j,3] <- abs(PT5[j,3])
+					}
+				}
+			}
+			QTLsts <- rbind(QTLsts,PT5)
+			QTLsts2 <- rbind(QTLsts2,filter(PT5,POS%in%PT[PT==QTLT$POS]))			
+		}	
+	}
+	QTLsts2 <- filter(QTLsts2,QTLAncestral!="?")
+	QTLsts2$QTLAncestral <- factor(QTLsts2$QTLAncestral,unique(QTLsts2$QTLAncestral))
+	outv <- list("Distances"=QTLspos,"Values"=QTLsts,"Exact"=QTLsts2)
+	return(outv)
 }
 
+# Loading libraries and reading in data
 library(qvalue)
+library(tidyverse)
 setwd("/Users/hartfield/Documents/MilkSDS/HOL_Data_Analysis")
 SDSres <- read.table(paste0("SDSAll_",fname,"N0.dat"),header=T)
 cno <- c(1:24,26:29)
@@ -36,18 +192,37 @@ names(SDSres)[12] <- "Bin"
 binM <- tapply(as.numeric(as.character(SDSres[,10])), SDSres[,12],function(x) (mean(x,na.rm=T)))
 binSD <- tapply(as.numeric(as.character(SDSres[,10])), SDSres[,12],function(x) (sd(x,na.rm=T)))
 
-## Normalising SDS scores per bin of DAF (taking absolute values)
+## Normalising SDS scores per bin of DAF
 SDSres <- cbind(SDSres,vector(mode="numeric",length=dim(SDSres)[1]),vector(mode="numeric",length=dim(SDSres)[1]))
 names(SDSres)[13] <- "sSDS"
 names(SDSres)[14] <- "pSDS"
 for(i in 1:length(binM)){
-	SDSres[SDSres[,12]==i,13] <- abs((SDSres[SDSres[,12]==i,10]-binM[i])/binSD[i])
-	SDSres[SDSres[,12]==i,14] <- fnP(SDSres[SDSres[,12]==i,13])
+	SDSres[SDSres[,12]==i,13] <- (SDSres[SDSres[,12]==i,10]-binM[i])/binSD[i]
+	SDSres[SDSres[,12]==i,14] <- pnorm(SDSres[SDSres[,12]==i,13],lower.tail=F)
 }
+
 # Calculating FDR values from p-values
 qobj <- qvalue(p = SDSres[,14])
 SDSres[,15] <- qobj$qvalues
 names(SDSres)[15] <- "qSDS"
+
+# QQ values of normalised scores per bin
+png(paste0('OutFigures/SDS_QQPlots_',fname,'N0.png'),width=4*(1+sqrt(5)),height=8,units = 'in',res=200)
+par(mfrow=c(3,6))
+for(i in 1:length(binM)){
+	qqnorm(subset(SDSres,Bin==i)$sSDS, main=paste0("Normal Q-Q Plot, Bin ",i))
+	qqline(subset(SDSres,Bin==i)$sSDS)
+}
+dev.off()
+
+# Histogram of DAF
+if(fname == "High")
+{
+	png(paste0('OutFigures/SDS_DAF_Hist.png'),width=8,height=8,units = 'in',res=200)
+	hist(SDSres$DAF,breaks=seq(0.05,0.95,0.05),main=paste0("Histogram of Derived Allele Frequencies"),xlab="Derived Allele Frequency",xaxt="n")
+	axis(1,at=seq(0.05,0.95,0.1),pos=(0))
+	dev.off()
+}
 
 ## Part 1: Finding regions with significantly high absolute SDS.
 alpha <- (0.05/dim(SDSres)[1])
@@ -60,7 +235,9 @@ cat(paste0(dim(SigSDSRes)[1]," SNPs with Bonferroni-corrected P < 0.05\n"))
 SigSDS2 <- intersect(which((SDSres[,15] < 0.05)),which((as.numeric(as.character(SDSres[,9])) >= 1)))
 SDSres[SigSDS2,] -> SigSDSRes2
 SDS_CO2 <- min(SigSDSRes2[,13])
+SDS_CO2_P <- SigSDSRes2[ which(SigSDSRes2[,13]==SDS_CO2),14]
 cat(paste0(dim(SigSDSRes2)[1]," SNPs with FDR < 0.05\n"))
+cat(paste0("Smallest SDS below FDR threshold: ",SDS_CO2,"\n"))
 
 # Plotting absolute SDS, with outlier regions
 colrs <- vector(mode="character",length=dim(SDSres)[1])
@@ -88,31 +265,18 @@ colrs[intersect(SigSDS,SigSDS2)] <- "red"
 colrs[setdiff(SigSDS,SigSDS2)] <- "purple"
 colrs[setdiff(SigSDS2,SigSDS)] <- "blue"
 
-png(paste0('OutFigures/SDS_Chr_All_AbsVal_',fname,'N0.png'),width=4*(1+sqrt(5)),height=8,units = 'in',res=200)
-par(mar=c(5,8,4,2) + 0.1)
-plot(SDSres[,13],col=colrs,pch=16, xaxt="n", yaxt="n", xlab="Chromosome",ylab="",main=substitute(bold(paste("Absolute Standardised SDS for ",bolditalic('Bos taurus')," Autosomes"))),ylim=c(0,8))
+png(paste0('OutFigures/SDS_Chr_All_',fname,'N0.png'),width=4*(1+sqrt(5)),height=8,units = 'in',res=200)
+par(mar=c(5,8.75,4,2) + 0.1)
+ymax <- ceiling(max(-log10(SDSres[,14])))
+#plot(SDSres[,13],col=colrs,pch=16, xaxt="n", yaxt="n", xlab="Chromosome",ylab="",main=substitute(bold(paste("Standardised SDS for ",bolditalic('Bos taurus')," Autosomes"))),ylim=c(-8,8))
+plot(-log10(SDSres[,14]), col=colrs, pch=16, xaxt="n", yaxt="n", xlab="Chromosome",ylab="",main=substitute(bold(paste("Standardised SDS Results for ",bolditalic('Bos taurus')," Autosomes"))),ylim=c(0,ymax))
 axis(1, at=tickpos, labels=cno)
-axis(2, at=seq(0,8,2), las=2)
-text(x=-275000,y=4,labels=paste("Absolute","Standardised","SDS",sep="\n"),xpd=NA)
-abline(SDS_CO,0,lty=2)
-abline(SDS_CO2,0,lty=3)
+axis(2, at=seq(0,ymax,2), las=2)
+text(x=-275000,y=(ymax/2),labels=paste("Standardised","SDS","\u2013Log10 P\u2013Value",sep="\n"),xpd=NA)
+abline(-log10(alpha),0,lty=2)
+abline(-log10(SDS_CO2_P),0,lty=3)
 legend("topleft", legend=c(expression("Bonferroni\u2013"*"Corrected "*italic("P")*" < 0.05"), "FDR < 0.05"),col=c("red", "blue"),pch=16)
 dev.off()
-
-## Part 2: Are any high SDS scores within milk-producing regions?
-# Reading in and classifying milk-producing regions
-milky <- read.table("Milk_Protein_Genes/milk_protein_names.bed",skip=1)[,1:3] # Only including gene locations and autosomal genes
-names(milky) <- c("chrom","chromStart","chromEnd")
-milky$chrom <- factor(milky$chrom, levels=unique(SDSres$CHROMOSOME))
-sigmilk <- vector(mode="numeric",length=0)
-for(i in unique(milky$chrom)){
-	hpss <- as.matrix(subset(milky,chrom==i)[2:3])
-	SDST <- subset(SigSDSRes,CHROMOSOME==i)
-	SDST2 <- subset(SigSDSRes2,CHROMOSOME==i)	
-	sigmilk <-c(sigmilk,unlist(apply(hpss,1,function(x) row.names(SDST[intersect(which(SDST[SDST$CHROMOSOME==i,5] >= x[1]), which(SDST[SDST$CHROMOSOME==i,5] <= x[2])),]))))
-}
-sigmilk		# Milk genes overlapping with highly-significant SDS regions
-SigSDSRes2[row.names(SigSDSRes2)%in%sigmilk,]
 
 # Print BED file of significant regions for bedtools analysis
 space <- 10000		# How much space to add either side (to look for nearby genes as well)
@@ -156,203 +320,141 @@ SDSres2 <- SDSres[!(row.names(SDSres)%in%row.names(SigSDSRes)),]
 row.names(SDSres2) <- c(1:dim(SDSres2)[1])
 SDSres2$CHROMOSOME = factor(SDSres2$CHROMOSOME,levels=orderedChr)
 
-## Part 3: including milk-gene as a factor. Putting scores in bins, determining effect of milk on SDS.
+## Part 2: Are any high SDS scores within milk-producing regions?
 
-# Classifying milk-producing regions
-milkreg <- vector(mode="numeric",length=0)
-for(i in unique(milky$chrom)){
-	hpss <- as.matrix(subset(milky,chrom==i)[2:3])
-	SDST <- subset(SDSres2,CHROMOSOME==i)
-	milkreg<-c(milkreg,unlist(apply(hpss,1,function(x) row.names(SDST[intersect(which(SDST[SDST$CHROMOSOME==i,5] >= x[1]), which(SDST[SDST$CHROMOSOME==i,5] <= x[2])),]))))
-}
-names(milkreg) <- NULL
+# Start with fat percentage QTL
+milkfQTL <- readRDS("MilkQTL/qtls_tbl_fat_curated.rds")
+milkfQTL <- filter(milkfQTL,German_Holstein==French_Holstein)		# Filtering out those with conflicting effect sizes
+milkfv <- QTLpol(milkfQTL,SDSres2)
+nQmf <- dim(milkfv$Values)[1]
+cat("For milk fat percentage:\n")
+cat(nQmf,"QTLs have SDS scores assigned to them.\n")
 
-# Adding column stating if SNPs lie within a milk-producing region
-SDSres2 <- cbind(SDSres2,vector(mode="numeric",length=dim(SDSres2)[1]))
-names(SDSres2)[16] <- "Milk"
-SDSres2[,16] <- 0
-SDSres2[row.names(SDSres2)%in%milkreg,16] <- 1
-SDSres2[!(row.names(SDSres2)%in%milkreg),16] <- 0
-SDSres2$Milk <- factor(SDSres2$Milk,levels=unique(SDSres2$Milk))
+# Next, protein content
+milkpQTL <- readRDS("MilkQTL/qtls_tbl_prot_curated.rds")
+milkpQTL <- filter(milkpQTL,German_Holstein==French_Holstein) %>% filter(chr!=25) %>% filter(`ARS-UCD2.1`!="deleted")		# Filtering out those with conflicting effect sizes; those on Chr 25; where not present in ARS background
+milkpv <- QTLpol(milkpQTL,SDSres2)
+nQmp <- dim(milkpv$Values)[1]
+cat("For milk protein percentage:\n")
+cat(nQmp,"QTLs have SDS scores assigned to them.\n")
 
-# Plotting histogram of sSDS (red) with milk histogram on top (blue)
-# Acknowledgement for overlapping histograms: https://www.r-bloggers.com/overlapping-histogram-in-r/
-MilkSDS <- subset(SDSres2,Milk==1)$sSDS
-maxx <- ceiling(max(hist(SDSres2$sSDS, breaks=30, plot=F)$breaks))
-maxy <- max(max(hist(MilkSDS, breaks=30, plot=F)$density),max(hist(SDSres2$sSDS, breaks=30, plot=F)$density))
-png(paste0('OutFigures/SDS_Abs_HistS_',fname,'N0.png'),width=8,height=8,units = 'in',res=200)
-par(mar=c(5,6.5,4,1.5) + 0.1)
-hist(SDSres2$sSDS, breaks=30, prob=T, col=rgb(1,0,0,0.5), xlim=c(0,maxx), ylim=c(0, maxy), xaxt="n", yaxt="n", xlab="",ylab="",main="")
-axis(1,at=seq(0, maxx,1),pos=(0))
-axis(2, at=seq(0,0.8,0.2), las=2)
-title("Absolute Standardised SDS with Milk Protein Genes Values",xlab="Absolute Standardised SDS")
-text(x=-1.25,y=0.4,labels=paste("Density",sep="\n"),xpd=NA)
-hist(MilkSDS, breaks=30, prob=T, col=rgb(0,0,1,0.5), add=T)
-legend("topright", legend=c("All regions", "Milk Protein Genes"),col=c(rgb(1,0,0,0.5), rgb(0,0,1,0.5)),lwd=10)
+# Histogram of distances to nearest SNP
+png(paste0('OutFigures/QTL_Milk_dist_',fname,'N0.png'),width=4*(1+sqrt(5)),height=8,units = 'in',res=200)
+par(mfrow=c(1,2))
+hist(milkfv$Distances,main="Histogram of distances to nearest QTL\n(milk fat percentage)",xlab="Distance")
+hist(milkpv$Distances,main="Histogram of distances to nearest QTL\n(milk protein content)",xlab="Distance")
 dev.off()
 
-# General Linear model fit, comparing milk and non-milk regions, Gamma link function.
-SDSres2$CHROMOSOME <- factor(SDSres2$CHROMOSOME,levels=unique(SDSres2$CHROMOSOME))
-SDSres2$Bin <- factor(SDSres2$Bin,levels=unique(SDSres2$Bin))
-SDSres2$Bin <- relevel(SDSres2$Bin,ref="1")
-SDSres2$Milk <- relevel(SDSres2$Milk,ref="0")
-fitg <- glm(sSDS ~ CHROMOSOME + Bin + Milk,data=SDSres2,family=Gamma(link="inverse"));summary(fitg)
-fitg0 <- glm(sSDS ~ CHROMOSOME + Bin,data=SDSres2,family=Gamma(link="inverse"));summary(fitg0)
-anova(fitg0,fitg,test="Chisq")
+milkfv$Values$Bin <- factor(milkfv$Values$Bin,levels=unique(milkfv$Values$Bin))
+milkpv$Values$Bin <- factor(milkpv$Values$Bin,levels=unique(milkpv$Values$Bin))
 
-# Print summary to file
-sink(file=paste0("OutTables/Milk_GLM_Summary_",fname,"N0.txt"))
-summary(fitg)
-anova(fitg0,fitg,test="Chisq")
-sink()
+cat("Linear model test with all datapoints\n")
+milkf_lm <- lm(sSDS ~ p,data=milkfv$Value)
+milkp_lm <- lm(sSDS ~ p,data=milkpv$Value)
+summary(milkf_lm)
+summary(milkp_lm)
 
-# Part 4: Reading in Stature QTL data. First where effect sizes estimated in 6 of 7 Holstein
-# These QTLs have positions relative to old assembly (UMD)
-milkQTL <- readRDS("QTLStatureDat/curated_stature_snps_6.rds")
-QTLi <- noquote(matrix(data=unlist(strsplit(milkQTL$position,":")),nrow=dim(milkQTL)[1],ncol=2,byrow=T))
-QTLi <- data.frame(CHROMOSOME=QTLi[,1],POS=QTLi[,2],milkQTL[,2])
-names(QTLi)[3] <- "EFFECT"
-QTLi <- QTLi[QTLi$CHROMOSOME!="Chr25",]
-QTLi$CHROMOSOME <- factor(QTLi$CHROMOSOME,levels=orderedChr)
-QTLi$POS <- as.numeric(QTLi$POS)
-QTLi$EFFECT <- as.numeric(QTLi$EFFECT)
+# Removing points with outlier p-value and repeating
+milkfv2 <- subset(milkfv$Value,p<max(milkfv$Value$p))
+milkpv2 <- subset(milkpv$Value,p<max(milkpv$Value$p))
 
-# Obtaining new QTL positions in ARS-UCD assembly
-nQTL <- read.table("StatureQTLs/securenew.qtl",head=T)		 		# 'Secure' QTLs
-nQTLn <- read.table("StatureQTLs/nonsecurenew.qtl",head=T)	 		# 'Nonsecure' QTLs
-nQTL <- rbind(nQTL,nQTLn[,c(1:3,5)])
-nQTL <- nQTL[order(nQTL$UMDChr, nQTL$UMDPos),]
-nQTL$UMDChr <- paste("Chr",nQTL$UMDChr,sep="")
-nQTL$ARSChr <- paste("Chr",nQTL$ARSChr,sep="")
-nQTL <- nQTL[nQTL$UMDChr!="Chr25",]
-nQTL$UMDChr <- factor(nQTL$UMDChr,levels=orderedChr)
-nQTL$ARSChr <- factor(nQTL$ARSChr,levels=orderedChr)
-row.names(nQTL) <- c(1:dim(nQTL)[1])
+cat("Linear model test after removing high p-value\n")
+milkf_lm2 <- lm(sSDS ~ p,data=milkfv2)
+milkp_lm2 <- lm(sSDS ~ p,data=milkpv2)
+summary(milkf_lm2)
+summary(milkp_lm2)
 
-# Now matching old positions to new ones
-nidx <- match(QTLi$POS,nQTL$UMDPos)								# Finding new positions in lookup table
-QTLi <- cbind(QTLi,nQTL[nidx,c(3,4)])
-QTLi <- QTLi[!is.na(QTLi$ARSPos),]
-QTLi <- QTLi[QTLi$CHROMOSOME==QTLi$ARSChr,]
-QTLi$POS <- QTLi$ARSPos
-QTLi <- QTLi[,1:3]
+# Part 3: Reading in Stature QTL data. First where effect sizes estimated in 6 of 7 Holstein
+# These QTLs have positions relative to old assembly (UMD), the function transfers them to ARS-UCD assembly
 
-# Initial number of QTL (excluding Chr 25)
-nQ <- dim(QTLi)[1];nQ
+statQTL6 <- readRDS("QTLStatureDat/curated_stature_snps_6_2020.rds")
+stat6res <- QTLspol(statQTL6,SDSres2)
+nQ26Q <- dim(stat6res$Values)[1]		# Number of QTL with SNPs assigned to them
+s6Qmm <- filter(stat6res$Exact,QTLAncestral!=ANC)  # QTLs where listed ancestral state != new ancestral
+cat("For stature QTLs with effects in 6 of 7 breeds:\n")
+cat(nQ26Q,"QTLs have SDS scores assigned to them.\n")
+cat(dim(s6Qmm)[1],"QTLs where anc SNP in database differs from current polarisation.\n")
 
-# Finding nearest SNP to each QTL
-QTLSDS <- matrix(data=NA,nrow=0,ncol=2)
-QTLP <- vector(mode="numeric",length=0)
-for(i in unique(SDSres2$CHROMOSOME)){
-	SDST <- subset(SDSres2,CHROMOSOME==i)
-	bounds <- c(min(SDST $POS),max(SDST$POS))
-	QTLT <- subset(QTLi,CHROMOSOME==i)
-	QTLT <- QTLT[((QTLT$POS>=bounds[1])+(QTLT$POS<=bounds[2]) == 2),] 	# Removing QTLs that lie in telomeric regions
-	QTLT <- QTLT[!(apply(QTLT,1,function(x) SDST[which(abs(SDST$POS-as.numeric(x[2]))==min(abs(SDST$POS-as.numeric(x[2])))),5])%in%bounds),]	# Removing QTLs where nearest SNP is at edge of range
-	PT <- apply(QTLT,1,function(x) SDST[which(abs(SDST$POS-as.numeric(x[2]))==min(abs(SDST$POS-as.numeric(x[2])))),5])
-	QTLP <- c(QTLP,row.names(SDST[SDST$POS%in%PT,]))
-	QTLSDS <- rbind(QTLSDS,cbind(SDST[SDST$POS%in%PT,13], abs(QTLT[,3])))
-}
-nQ2 <- dim(QTLSDS)[1];nQ2	# Number of QTL with SNPs assigned to them
+# effect sizes in 5 of 7 Holstein
+statQTL5 <- readRDS("QTLStatureDat/curated_stature_snps_5_2020.rds")
+stat5res <- QTLspol(statQTL5,SDSres2)
+nQ25Q <- dim(stat5res$Values)[1]		# Number of QTL with SNPs assigned to them
+stat5res$Values$ANC <- factor(stat5res$Values$ANC,levels(stat5res$Values$QTLAncestral))
+s5Qmm <- filter(stat5res$Exact,QTLAncestral!=ANC)  # QTLs where listed ancestral state != new ancestral
+cat("For stature QTLs with effects in 5 of 7 breeds:\n")
+cat(nQ25Q,"QTLs have SDS scores assigned to them.\n")
+cat(dim(s5Qmm)[1],"QTLs where anc SNP in database differs from current polarisation.\n")
 
-# Setting up GLM, see if stature QTLs significantly differ from background
-SDSres2 <- cbind(SDSres2,vector(mode="numeric",length=dim(SDSres2)[1]))
-names(SDSres2)[17] <- "isnearQTL"
-SDSres2[,17] <- 0
-SDSres2[row.names(SDSres2)%in%QTLP,17] <- 1
-SDSres2$isnearQTL <- factor(SDSres2$isnearQTL,levels=unique(SDSres2$isnearQTL))
-SDSres2$isnearQTL <- relevel(SDSres2$isnearQTL,ref="0")
+stat6res$Values$Bin <- factor(stat6res$Values$Bin,levels=unique(stat6res$Values$Bin))
+stat5res$Values$Bin <- factor(stat5res$Values$Bin,levels=unique(stat5res$Values$Bin))
 
-# Plotting histogram of sSDS (red) with stature QTL histogram on top (blue)
-maxx <- ceiling(max(hist(SDSres2$sSDS, breaks=30, plot=F)$breaks))
-maxy <- max(max(hist(QTLSDS[,1], breaks=30, plot=F)$density),max(hist(SDSres2$sSDS, breaks=30, plot=F)$density))
-png(paste0('OutFigures/SDS_Abs_HistS_',fname,'N0_StatureQTL_6.png'),width=8,height=8,units = 'in',res=200)
-par(mar=c(5,6.5,4,1.5) + 0.1)
-hist(SDSres2$sSDS, breaks=30, prob=T, col=rgb(1,0,0,0.5), xlim=c(0,maxx), ylim=c(0, maxy+0.2), xaxt="n", yaxt="n", xlab="",ylab="",main="")
-axis(1,at=seq(0, maxx,1),pos=(0))
-axis(2, at=seq(0,maxy+0.2,0.2), las=2)
-title("Absolute Standardised SDS with Stature QTL Values",xlab="Absolute Standardised SDS")
-text(x=-1.25,y=(maxy/2),labels=paste("Density",sep="\n"),xpd=NA)
-hist(QTLSDS[,1], breaks=30, prob=T, col=rgb(0,0,1,0.5), add=T)
-legend("topright", legend=c("All regions", "SNPs near stature QTLs"),col=c(rgb(1,0,0,0.5), rgb(0,0,1,0.5)),lwd=10)
+# Histogram of distances to nearest SNP
+png(paste0('OutFigures/QTL_Stature_dist_',fname,'N0.png'),width=4*(1+sqrt(5)),height=8,units = 'in',res=200)
+par(mfrow=c(1,2))
+hist(stat6res$Distances,main="Histogram of distances to nearest QTL\n(stature, 6 of 7 breeds)",xlab="Distance")
+hist(stat5res$Distances,main="Histogram of distances to nearest QTL\n(stature, 5 of 7 breeds)",xlab="Distance")
 dev.off()
 
-# Running GLM analysis
-fitgQ <- glm(sSDS ~ CHROMOSOME + Bin + isnearQTL,data=SDSres2,family=Gamma(link="inverse"));summary(fitgQ)
-anova(fitg0,fitgQ,test="Chisq")
+stat6_lm <- lm(sSDS ~ p,data=stat6res$Value)
+stat5_lm <- lm(sSDS ~ p,data=stat5res$Value)
+summary(stat6_lm)
+summary(stat5_lm)
 
-# Print summary to file
-sink(file=paste0("OutTables/Stature_GLM_Summary_6_",fname,"N0.txt"))
-cat(paste0("Number of QTL initially ",nQ,"; with SNP effects assigned, ",nQ2,"\n"))
-summary(fitgQ)
-anova(fitg0,fitgQ,test="Chisq")
-sink()
-
-# Part 4a: Repeating for QTLs with effect sizes in at least 5 of 7 Holstein
-# Original co-ordinates in UMD assembly
-milkQTL <- readRDS("QTLStatureDat/curated_stature_snps_5.rds")
-QTLi <- noquote(matrix(data=unlist(strsplit(milkQTL$position,":")),nrow=dim(milkQTL)[1],ncol=2,byrow=T))
-QTLi <- data.frame(CHROMOSOME=QTLi[,1],POS=QTLi[,2],milkQTL[,2])
-names(QTLi)[3] <- "EFFECT"
-QTLi <- QTLi[QTLi$CHROMOSOME!="Chr25",]
-QTLi$CHROMOSOME <- factor(QTLi$CHROMOSOME,levels=orderedChr)
-QTLi$POS <- as.numeric(QTLi$POS)
-QTLi$EFFECT <- as.numeric(QTLi$EFFECT)
-
-# Now matching old positions to new ones
-nidx <- match(QTLi$POS,nQTL$UMDPos)								# Finding new positions in lookup table
-QTLi <- cbind(QTLi,nQTL[nidx,c(3,4)])
-QTLi <- QTLi[!is.na(QTLi$ARSPos),]
-QTLi <- QTLi[QTLi$CHROMOSOME==QTLi$ARSChr,]
-QTLi$POS <- QTLi$ARSPos
-QTLi <- QTLi[,1:3]
-
-nQ <- dim(QTLi)[1];nQ	# Initial number of QTL (excluding Chr 25)
-
-# Finding nearest SNP to each QTL
-QTLSDS <- matrix(data=NA,nrow=0,ncol=2)
-QTLP <- vector(mode="numeric",length=0)
-for(i in unique(SDSres2$CHROMOSOME)){
-	SDST <- subset(SDSres2,CHROMOSOME==i)
-	bounds <- c(min(SDST $POS),max(SDST$POS))
-	QTLT <- subset(QTLi,CHROMOSOME==i)
-	QTLT <- QTLT[((QTLT$POS>=bounds[1])+(QTLT$POS<=bounds[2]) == 2),] 	# Removing QTLs that lie in telomeric regions
-	QTLT <- QTLT[!(apply(QTLT,1,function(x) SDST[which(abs(SDST$POS-as.numeric(x[2]))==min(abs(SDST$POS-as.numeric(x[2])))),5])%in%bounds),]	# Removing QTLs where nearest SNP is at edge of range
-	PT <- apply(QTLT,1,function(x) SDST[which(abs(SDST$POS-as.numeric(x[2]))==min(abs(SDST$POS-as.numeric(x[2])))),5])
-	QTLP <- c(QTLP,row.names(SDST[SDST$POS%in%PT,]))
-	QTLSDS <- rbind(QTLSDS,cbind(SDST[SDST$POS%in%PT,13], abs(QTLT[,3])))
+# Plots of correlations between sSDS, QTL P-values
+pfunc <- function(data,mt,xp,ma)
+{
+	par(mar=c(5,7.5,4,2) + 0.1)
+	plot(sSDS~p,data=data,xlab="Absolute Log10 QTL P-Value",ylab="",main=ma,pch=16,las=1)
+	ymp <- min(data$sSDS)+(max(data$sSDS)-min(data$sSDS))/2
+	text(x=xp,y=ymp,labels=paste("sSDS",sep="\n"),xpd=NA)
+	abline(mt)
 }
-nQ2 <- dim(QTLSDS)[1];nQ2	# Number of QTL with SNPs assigned to them
 
-# Setting up GLM, see if stature QTLs significantly differ from background
-SDSres2[,17] <- 0
-SDSres2[row.names(SDSres2)%in%QTLP,17] <- 1
-SDSres2$isnearQTL <- factor(SDSres2$isnearQTL,levels=unique(SDSres2$isnearQTL))
-SDSres2$isnearQTL <- relevel(SDSres2$isnearQTL,ref="0")
-
-# Plotting histogram of sSDS (red) with stature QTL histogram on top (blue)
-maxx <- ceiling(max(hist(SDSres2$sSDS, breaks=30, plot=F)$breaks))
-maxy <- max(max(hist(QTLSDS[,1], breaks=30, plot=F)$density),max(hist(SDSres2$sSDS, breaks=30, plot=F)$density))
-png(paste0('OutFigures/SDS_Abs_HistS_',fname,'N0_StatureQTL_5.png'),width=8,height=8,units = 'in',res=200)
-par(mar=c(5,6.5,4,1.5) + 0.1)
-hist(SDSres2$sSDS, breaks=30, prob=T, col=rgb(1,0,0,0.5), xlim=c(0,maxx), ylim=c(0, maxy+0.2), xaxt="n", yaxt="n", xlab="",ylab="",main="")
-axis(1,at=seq(0, maxx,1),pos=(0))
-axis(2, at=seq(0,maxy+0.2,0.2), las=2)
-title("Absolute Standardised SDS with Stature QTL Values",xlab="Absolute Standardised SDS")
-text(x=-1.25,y=(maxy/2),labels=paste("Density",sep="\n"),xpd=NA)
-hist(QTLSDS[,1], breaks=30, prob=T, col=rgb(0,0,1,0.5), add=T)
-legend("topright", legend=c("All regions", "SNPs near stature QTLs"),col=c(rgb(1,0,0,0.5), rgb(0,0,1,0.5)),lwd=10)
+png(paste0('OutFigures/QTL_All_SDS_',fname,'N0.png'),width=12,height=12,units = 'in',res=200)
+par(mfrow=c(2,2))
+pfunc(milkfv$Values,milkf_lm,-10,"(a) Milk fat percentage")
+pfunc(milkpv$Values,milkp_lm,-45,"(b) Milk protein percentage")
+pfunc(stat6res$Values,stat6_lm,4.5,"(c) Stature, determined from 6 of 7 breeds")
+pfunc(stat5res$Values,stat5_lm,4,"(d) Stature, determined from 5 of 7 breeds")
 dev.off()
 
-# Running GLM analysis
-fitgQ <- glm(sSDS ~ CHROMOSOME + Bin + isnearQTL,data=SDSres2,family=Gamma(link="inverse"));summary(fitgQ)
-anova(fitg0,fitgQ,test="Chisq")
+# Plot of correlations, milk data without outlier p-value
+png(paste0('OutFigures/QTL_Milk_SDS_NoOutlier_',fname,'N0.png'),width=12,height=6,units = 'in',res=200)
+par(mfrow=c(1,2))
+pfunc(milkfv2,milkf_lm2,1.5,"(a) Milk fat percentage")
+pfunc(milkpv2,milkp_lm2,-15,"(b) Milk protein percentage")
+dev.off()
 
-# Print summary to file
-sink(file=paste0("OutTables/Stature_GLM_Summary_5_",fname,"N0.txt"))
-cat(paste0("Number of QTL initially ",nQ,"; with SNP effects assigned, ",nQ2,"\n"))
-summary(fitgQ)
-anova(fitg0,fitgQ,test="Chisq")
-sink()
+# Diagnostic plots for LM fits
+png(paste0('OutFigures/QTL_SDS_LM_milkf_',fname,'N0.png'),width=12,height=12,units = 'in',res=200)
+par(mfrow=c(2,2))
+plot(milkf_lm)
+dev.off()
+
+png(paste0('OutFigures/QTL_SDS_LM_milkp_',fname,'N0.png'),width=12,height=12,units = 'in',res=200)
+par(mfrow=c(2,2))
+plot(milkp_lm)
+dev.off()
+
+# Diagnostic plots for LM fits
+png(paste0('OutFigures/QTL_SDS_LM_milkf2_',fname,'N0.png'),width=12,height=12,units = 'in',res=200)
+par(mfrow=c(2,2))
+plot(milkf_lm2)
+dev.off()
+
+png(paste0('OutFigures/QTL_SDS_LM_milkp2_',fname,'N0.png'),width=12,height=12,units = 'in',res=200)
+par(mfrow=c(2,2))
+plot(milkp_lm2)
+dev.off()
+
+png(paste0('OutFigures/QTL_SDS_LM_stat6_',fname,'N0.png'),width=12,height=12,units = 'in',res=200)
+par(mfrow=c(2,2))
+plot(stat6_lm)
+dev.off()
+
+png(paste0('OutFigures/QTL_SDS_LM_stat5_',fname,'N0.png'),width=12,height=12,units = 'in',res=200)
+par(mfrow=c(2,2))
+plot(stat5_lm)
+dev.off()
 
 # EOF

@@ -64,7 +64,7 @@ parser.add_argument("-sNe", "--scale_Ne",
 
 parser.add_argument("-m", "--population_size_model",
                     choices=["Tennessen_CEU","Gravel_AFR","Gravel_CEU","Gravel_CHB","Const_1E4","Holstein","HolsteinLNO"],
-                    default="Tennessen_CEU",
+                    default="Holstein",
                     help="Define the population size history model. \
                           (default = %(default)s).")
 
