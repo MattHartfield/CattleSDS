@@ -31,7 +31,7 @@ QTLpol <- function(milkfQTL,SDSres2)
 	milkfQTL$pos <- as.numeric(milkfQTL$pos)
 
 	# Reading in table of allele polarisation
-	apol <- read.table(paste0("SDSAll_Polarisation.dat"),header=T)
+	apol <- read.table(paste0("../SDSAll_Polarisation.dat"),header=T)
 	apol$CHROMOSOME = factor(apol$CHROMOSOME,levels=orderedChr)
 
 	# Finding nearest SNP to each QTL, obtaining SDS score
@@ -119,7 +119,7 @@ QTLspol <- function(statQTL6,SDSres2)
 	nQ <- dim(QTLi)[1];nQ
 	
 	# Reading in table of allele polarisation
-	apol <- read.table(paste0("SDSAll_Polarisation.dat"),header=T)
+	apol <- read.table(paste0("../SDSAll_Polarisation.dat"),header=T)
 	apol$CHROMOSOME = factor(apol$CHROMOSOME,levels=orderedChr)
 	
 	# Finding nearest SNP to each QTL
@@ -186,10 +186,10 @@ library(tidyverse)
 theseed <- sample(2147483647-1,1)
 set.seed(theseed)
 cat("Seed is ", theseed, "\n",sep="")
-setwd("/Users/hartfield/Documents/MilkSDS/HOL_Data_Analysis")
-#setwd("/usr/home/qgg/mhart/MilkSDS_Dec18/PermutationTest")
-#SDSres <- read.table(paste0("../SDSAll_",fname,"N0.dat"),header=T)
-SDSres <- read.table(paste0("SDSAll_",fname,"N0.dat"),header=T)
+#setwd("/Users/hartfield/Documents/MilkSDS/HOL_Data_Analysis")
+setwd("/usr/home/qgg/mhart/MilkSDS_Dec18/PermutationTest")
+SDSres <- read.table(paste0("../SDSAll_",fname,"N0.dat"),header=T)
+#SDSres <- read.table(paste0("SDSAll_",fname,"N0.dat"),header=T)
 cno <- c(1:24,26:29)
 orderedChr=paste("Chr",cno, sep="")
 SDSres$CHROMOSOME = factor(SDSres$CHROMOSOME,levels=orderedChr)

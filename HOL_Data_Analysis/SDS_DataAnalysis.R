@@ -401,29 +401,42 @@ summary(stat6_lm)
 summary(stat5_lm)
 
 # Plots of correlations between sSDS, QTL P-values
-pfunc <- function(data,mt,xp,ma)
+# Seperate setups for high, low N0
+pfunc <- function(data,mt,xp,ma,cin)
 {
 	par(mar=c(5,7.5,4,2) + 0.1)
-	plot(sSDS~p,data=data,xlab="Absolute Log10 QTL P-Value",ylab="",main=ma,pch=16,las=1)
+	plot(sSDS~p,data=data,xlab="Absolute Log10 QTL P-Value",ylab="",main=ma,pch=16,las=1,cex.lab=cin,cex.axis=cin,cex.main=cin*1.25)
 	ymp <- min(data$sSDS)+(max(data$sSDS)-min(data$sSDS))/2
-	text(x=xp,y=ymp,labels=paste("sSDS",sep="\n"),xpd=NA)
+	text(x=xp,y=ymp,labels=paste("sSDS",sep="\n"),xpd=NA,cex=cin)
 	abline(mt)
 }
 
-png(paste0('OutFigures/QTL_All_SDS_',fname,'N0.png'),width=12,height=12,units = 'in',res=200)
-par(mfrow=c(2,2))
-pfunc(milkfv$Values,milkf_lm,-10,"(a) Milk fat percentage")
-pfunc(milkpv$Values,milkp_lm,-45,"(b) Milk protein percentage")
-pfunc(stat6res$Values,stat6_lm,4.5,"(c) Stature, determined from 6 of 7 breeds")
-pfunc(stat5res$Values,stat5_lm,4,"(d) Stature, determined from 5 of 7 breeds")
-dev.off()
-
-# Plot of correlations, milk data without outlier p-value
-png(paste0('OutFigures/QTL_Milk_SDS_NoOutlier_',fname,'N0.png'),width=12,height=6,units = 'in',res=200)
-par(mfrow=c(1,2))
-pfunc(milkfv2,milkf_lm2,1.5,"(a) Milk fat percentage")
-pfunc(milkpv2,milkp_lm2,-15,"(b) Milk protein percentage")
-dev.off()
+if(ind==1){
+	png(paste0('OutFigures/QTL_All_SDS_',fname,'N0.png'),width=12,height=12,units = 'in',res=200)
+	par(mfrow=c(2,2))
+	pfunc(milkfv$Values,milkf_lm,-10,"(a) Milk fat percentage",1)
+	pfunc(milkpv$Values,milkp_lm,-45,"(b) Milk protein percentage",1)
+	pfunc(stat6res$Values,stat6_lm,4.5,"(c) Stature, determined from 6 of 7 breeds",1)
+	pfunc(stat5res$Values,stat5_lm,4,"(d) Stature, determined from 5 of 7 breeds",1)
+	dev.off()
+	
+	# Plot of correlations, milk data without outlier p-value
+	png(paste0('OutFigures/QTL_Milk_SDS_NoOutlier_',fname,'N0.png'),width=12,height=6,units = 'in',res=200)
+	par(mfrow=c(1,2))
+	pfunc(milkfv2,milkf_lm2,1.5,"(a) Milk fat percentage",1)
+	pfunc(milkpv2,milkp_lm2,-15,"(b) Milk protein percentage",1)
+	dev.off()
+}else if(ind==2){
+	png(paste0('OutFigures/QTL_All_SDS_',fname,'N0.png'),width=12,height=18,units = 'in',res=200)
+	par(mfrow=c(3,2))
+	pfunc(milkfv$Values,milkf_lm,-7.5,"(a) Milk fat percentage",1.5)
+	pfunc(milkpv$Values,milkp_lm,-35,"(b) Milk protein percentage",1.5)
+	pfunc(milkfv2,milkf_lm2,4.15,"(c) Milk fat percentage, outlier P-value removed",1.5)
+	pfunc(milkpv2,milkp_lm2,-10,"(d) Milk protein percentage, outlier P-value removed",1.5)
+	pfunc(stat6res$Values,stat6_lm,5,"(e) Stature, determined from 6 of 7 breeds",1.5)
+	pfunc(stat5res$Values,stat5_lm,4.5,"(f) Stature, determined from 5 of 7 breeds",1.5)
+	dev.off()
+}
 
 # Diagnostic plots for LM fits
 png(paste0('OutFigures/QTL_SDS_LM_milkf_',fname,'N0.png'),width=12,height=12,units = 'in',res=200)

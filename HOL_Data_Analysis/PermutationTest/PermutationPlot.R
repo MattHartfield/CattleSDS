@@ -37,7 +37,7 @@ colnames(tpv2) <- c("N0","Fval")
 tpv2$Fval <- as.numeric(as.character(tpv2$Fval))
 PmppH <- dat %>% filter(N0=="HighN0") %>% summarize(PmppH = sum(MilkProtF > as.double(tpv2[1,2]))/1000) %>% as.double
 PmppL <- dat %>% filter(N0=="LowN0") %>% summarize(PmppL = sum(MilkProtF > as.double(tpv2[2,2]))/1000) %>% as.double
-tpvt2 <- data.frame(N0=c("HighN0","LowN0"),plab=paste0("P-value = ", c(PmppH, PmppL)),x=12,y=70)
+tpvt2 <- data.frame(N0=c("HighN0","LowN0"),plab=paste0("P-value = ", c(PmppH, PmppL)),x=12,y=75)
 p2 <- ggplot(dat,aes(x=MilkProtF)) + geom_histogram(binwidth=0.025) + facet_wrap(~N0) + xlab("Permuted F-values, Milk Protein Content") + ylab("Count") + geom_vline(data=tpv2,aes(xintercept=Fval),linetype="dotted", size=1.25) + theme_bw(base_size=24) + geom_text(data=tpvt2,aes(x=x,y=y,label=plab),size=6) + theme(axis.title.y=element_text(angle=0,vjust=0.5))
 
 # Stature 6
@@ -45,7 +45,7 @@ tpv3 <-  as_tibble(cbind(unique(dat$N0),actpv[,3]))
 colnames(tpv3) <- c("N0","Fval")
 Ps6pH <- dat %>% filter(N0=="HighN0") %>% summarize(Ps6pH = sum(Stat6F > as.double(tpv3[1,2]))/1000) %>% as.double
 Ps6pL <- dat %>% filter(N0=="LowN0") %>% summarize(Ps6pL = sum(Stat6F > as.double(tpv3[2,2]))/1000) %>% as.double
-tpvt3 <- data.frame(N0=c("HighN0","LowN0"),plab=paste0("P-value = ", c(Ps6pH, Ps6pL)),x=8.5,y=70)
+tpvt3 <- data.frame(N0=c("HighN0","LowN0"),plab=paste0("P-value = ", c(Ps6pH, Ps6pL)),x=8.5,y=90)
 p3 <- ggplot(dat,aes(x=Stat6F)) + geom_histogram(binwidth=0.025) + facet_wrap(~N0) + xlab("Permuted F-values, Stature (6 of 7 breeds)") + ylab("Count") + geom_vline(data=tpv3,aes(xintercept=Fval),linetype="dotted", size=1.25) + theme_bw(base_size=24) + geom_text(data=tpvt3,aes(x=x,y=y,label=plab),size=6) + theme(axis.title.y=element_text(angle=0,vjust=0.5))
 
 # Stature 5
@@ -54,7 +54,7 @@ colnames(tpv4) <- c("N0","Fval")
 tpv4$Fval <- as.numeric(as.character(tpv4$Fval))
 Ps5pH <- dat %>% filter(N0=="HighN0") %>% summarize(Ps5pH = sum(Stat5F > as.double(tpv4[1,2]))/1000) %>% as.double
 Ps5pL <- dat %>% filter(N0=="LowN0") %>% summarize(Ps5pL = sum(Stat5F > as.double(tpv4[2,2]))/1000) %>% as.double
-tpvt4 <- data.frame(N0=c("HighN0","LowN0"),plab=paste0("P-value = ", c(Ps5pH, Ps5pL)),x=8.5,y=75)
+tpvt4 <- data.frame(N0=c("HighN0","LowN0"),plab=paste0("P-value = ", c(Ps5pH, Ps5pL)),x=8.5,y=85)
 p4 <- ggplot(dat,aes(x=Stat5F)) + geom_histogram(binwidth=0.025) + facet_wrap(~N0) + xlab("Permuted F-values, Stature (5 of 7 breeds)") + ylab("Count") + geom_vline(data=tpv4,aes(xintercept=Fval),linetype="dotted", size=1.25) + theme_bw(base_size=24) + geom_text(data=tpvt4,aes(x=x,y=y,label=plab),size=6) + theme(axis.title.y=element_text(angle=0,vjust=0.5))
 
 # All together!
