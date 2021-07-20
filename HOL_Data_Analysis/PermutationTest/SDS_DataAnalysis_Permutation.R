@@ -8,6 +8,7 @@
 # Set up so one can run from command line
 # Otherwise one can set 'ind' manually
 # 1 = High N0 case; 2 = Low N0 case
+
 args <- commandArgs(trailingOnly = TRUE)
 ind <- as.integer(args[1])
 idx <- as.integer(args[2])
@@ -56,19 +57,18 @@ QTLpol <- function(milkfQTL,SDSres2)
 			QTLmfsT[QTLmfsT$POS%in%apT$POS,3] <- ifelse(QTLmfsT[QTLmfsT$POS%in%apT$POS,3]<0,abs(QTLmfsT[QTLmfsT$POS%in%apT$POS,3]),(-1)*(QTLmfsT[QTLmfsT$POS%in%apT$POS,3]))
 			# Then polarising by QTL effect
 			QTLmfsT <- cbind(QTLmfsT,abs(log10(QTLT[,5])),QTLT[,7],0)
-			names(QTLmfsT)[8] <- "NegEff"
+			names(QTLmfsT)[8] <- "RePol"
 			for(j in 1:dim(QTLmfsT)[1])
 			{
-				# If negative effect size, swap sign of SDS score
-				if(QTLmfsT[j,7]=="-")
+				# Polarising SDS value with effect direction
+				if(QTLmfsT[j,7]=="+" & QTLmfsT[j,3]<0)
 				{
+					QTLmfsT[j,3] <- abs(QTLmfsT[j,3])
 					QTLmfsT[j,8] <- 1
-					if(QTLmfsT[j,3]>0)
-					{
-						QTLmfsT[j,3] <- (-1)*(QTLmfsT[j,3])
-					}else{
-						QTLmfsT[j,3] <- abs(QTLmfsT[j,3])
-					}
+				}else if(QTLmfsT[j,7]=="-" & QTLmfsT[j,3]>0)
+				{
+					QTLmfsT[j,3] <- (-1)*(QTLmfsT[j,3])
+					QTLmfsT[j,8] <- 1
 				}
 			}
 			QTLmfs <- rbind(QTLmfs,QTLmfsT)
@@ -155,19 +155,18 @@ QTLspol <- function(statQTL6,SDSres2)
 			PT5 <- cbind(PT5,QTLT[,3],abs(log10(QTLT[,4])),0)
 			names(PT5)[8] <- "EFFECT"
 			names(PT5)[9] <- "p"
-			names(PT5)[10] <- "NegEff"
+			names(PT5)[10] <- "RePol"
 			for(j in 1:dim(PT5)[1])
 			{
-				# If negative effect size, swap sign of SDS score
-				if(PT5[j,8]<0)
+				# Aligning effect size and SDS score
+				if(PT5[j,8] < 0 & PT5[j,3] > 0)
 				{
+					PT5[j,3] <- (-1)*(PT5[j,3])
 					PT5[j,10] <- 1
-					if(PT5[j,3]>0)
-					{
-						PT5[j,3] <- (-1)*(PT5[j,3])
-					}else{
-						PT5[j,3] <- abs(PT5[j,3])
-					}
+				}else if(PT5[j,8] > 0 & PT5[j,3] < 0)
+				{
+					PT5[j,3] <- abs(PT5[j,3])
+					PT5[j,10] <- 1
 				}
 			}
 			QTLsts <- rbind(QTLsts,PT5)
@@ -278,7 +277,7 @@ for(l in 1:length(list_dat))
 		Bink <- ttab[k,4]
 		sdsk <- as.numeric(SDSres2 %>% filter(CHROMOSOME==Chrk,Bin==Bink) %>% select(sSDS) %>% sample_n(1))
 		# Now deciding whether to change polarisation of score 
-		ispol <- rowSums(ttab[k,c("NotRef","NegEff")])
+		ispol <- rowSums(ttab[k,c("NotRef","RePol")])
 		if(ispol==1){
 			sdsk <- (-1)*sdsk
 		}

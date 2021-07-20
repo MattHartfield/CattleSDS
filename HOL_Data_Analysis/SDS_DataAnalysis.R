@@ -52,19 +52,18 @@ QTLpol <- function(milkfQTL,SDSres2)
 			QTLmfsT[QTLmfsT$POS%in%apT$POS,3] <- ifelse(QTLmfsT[QTLmfsT$POS%in%apT$POS,3]<0,abs(QTLmfsT[QTLmfsT$POS%in%apT$POS,3]),(-1)*(QTLmfsT[QTLmfsT$POS%in%apT$POS,3]))
 			# Then polarising by QTL effect
 			QTLmfsT <- cbind(QTLmfsT,abs(log10(QTLT[,5])),QTLT[,7],0)
-			names(QTLmfsT)[8] <- "NegEff"
+			names(QTLmfsT)[8] <- "RePol"
 			for(j in 1:dim(QTLmfsT)[1])
 			{
-				# If negative effect size, swap sign of SDS score
-				if(QTLmfsT[j,7]=="-")
+				# Polarising SDS value with effect direction
+				if(QTLmfsT[j,7]=="+" & QTLmfsT[j,3]<0)
 				{
+					QTLmfsT[j,3] <- abs(QTLmfsT[j,3])
 					QTLmfsT[j,8] <- 1
-					if(QTLmfsT[j,3]>0)
-					{
-						QTLmfsT[j,3] <- (-1)*(QTLmfsT[j,3])
-					}else{
-						QTLmfsT[j,3] <- abs(QTLmfsT[j,3])
-					}
+				}else if(QTLmfsT[j,7]=="-" & QTLmfsT[j,3]>0)
+				{
+					QTLmfsT[j,3] <- (-1)*(QTLmfsT[j,3])
+					QTLmfsT[j,8] <- 1
 				}
 			}
 			QTLmfs <- rbind(QTLmfs,QTLmfsT)
@@ -151,19 +150,18 @@ QTLspol <- function(statQTL6,SDSres2)
 			PT5 <- cbind(PT5,QTLT[,3],abs(log10(QTLT[,4])),0)
 			names(PT5)[8] <- "EFFECT"
 			names(PT5)[9] <- "p"
-			names(PT5)[10] <- "NegEff"
+			names(PT5)[10] <- "RePol"
 			for(j in 1:dim(PT5)[1])
 			{
-				# If negative effect size, swap sign of SDS score
-				if(PT5[j,8]<0)
+				# Aligning effect size and SDS score
+				if(PT5[j,8] < 0 & PT5[j,3] > 0)
 				{
+					PT5[j,3] <- (-1)*(PT5[j,3])
 					PT5[j,10] <- 1
-					if(PT5[j,3]>0)
-					{
-						PT5[j,3] <- (-1)*(PT5[j,3])
-					}else{
-						PT5[j,3] <- abs(PT5[j,3])
-					}
+				}else if(PT5[j,8] > 0 & PT5[j,3] < 0)
+				{
+					PT5[j,3] <- abs(PT5[j,3])
+					PT5[j,10] <- 1
 				}
 			}
 			QTLsts <- rbind(QTLsts,PT5)
@@ -268,11 +266,10 @@ colrs[setdiff(SigSDS2,SigSDS)] <- "blue"
 png(paste0('OutFigures/SDS_Chr_All_',fname,'N0.png'),width=4*(1+sqrt(5)),height=8,units = 'in',res=200)
 par(mar=c(5,8.75,4,2) + 0.1)
 ymax <- ceiling(max(-log10(SDSres[,14])))
-#plot(SDSres[,13],col=colrs,pch=16, xaxt="n", yaxt="n", xlab="Chromosome",ylab="",main=substitute(bold(paste("Standardised SDS for ",bolditalic('Bos taurus')," Autosomes"))),ylim=c(-8,8))
-plot(-log10(SDSres[,14]), col=colrs, pch=16, xaxt="n", yaxt="n", xlab="Chromosome",ylab="",main=substitute(bold(paste("Standardised SDS Results for ",bolditalic('Bos taurus')," Autosomes"))),ylim=c(0,ymax))
+plot(-log10(SDSres[,14]), col=colrs, pch=16, xaxt="n", yaxt="n", xlab="Chromosome",ylab="",main=substitute(bold(paste("sSDS Results for ",bolditalic('Bos taurus')," Autosomes"))),ylim=c(0,ymax))
 axis(1, at=tickpos, labels=cno)
 axis(2, at=seq(0,ymax,2), las=2)
-text(x=-275000,y=(ymax/2),labels=paste("Standardised","SDS","\u2013Log10 P\u2013Value",sep="\n"),xpd=NA)
+text(x=-275000,y=(ymax/2),labels=paste("sSDS","\u2013Log10 P\u2013Value",sep="\n"),xpd=NA)
 abline(-log10(alpha),0,lty=2)
 abline(-log10(SDS_CO2_P),0,lty=3)
 legend("topleft", legend=c(expression("Bonferroni\u2013"*"Corrected "*italic("P")*" < 0.05"), "FDR < 0.05"),col=c("red", "blue"),pch=16)
@@ -407,7 +404,7 @@ pfunc <- function(data,mt,xp,ma,cin)
 	par(mar=c(5,7.5,4,2) + 0.1)
 	plot(sSDS~p,data=data,xlab="Absolute Log10 QTL P-Value",ylab="",main=ma,pch=16,las=1,cex.lab=cin,cex.axis=cin,cex.main=cin*1.25)
 	ymp <- min(data$sSDS)+(max(data$sSDS)-min(data$sSDS))/2
-	text(x=xp,y=ymp,labels=paste("sSDS",sep="\n"),xpd=NA,cex=cin)
+	text(x=xp,y=ymp,labels=paste("tSDS",sep="\n"),xpd=NA,cex=cin)
 	abline(mt)
 }
 
