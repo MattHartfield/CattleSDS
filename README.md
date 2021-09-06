@@ -4,7 +4,7 @@ Scripts used in the study "Using singleton densities to detect recent selection 
 
 ### Gamma Shapes Calculation
 
-`DAF_Calc` folder contains scripts for computing gamma shapes on a computer cluster, along with the actual files used for both high and low N0 scenarios. Based on those provided in the [original SDS scripts](https://github.com/yairf/SDS "SDS Scripts"). Scripts assume that (i) simuPOP is available (used via conda in this case, see also [the simuPOP homepage](http://simupop.sourceforge.net/ "simuPOP"), (ii) ms is already present in each directory; it can be obtained from [here](http://home.uchicago.edu/rhudson1/source/mksamples.html "ms").
+`DAF_Calc` folder contains scripts for computing gamma shapes on a computer cluster, along with the actual files used for both high and low N0 scenarios. Based on those provided in the [original SDS scripts](https://github.com/yairf/SDS "SDS Scripts"). Scripts assume that (i) [simuPOP](http://simupop.sourceforge.net/ "simuPOP") is available, (ii) ms is present in each directory; it can be obtained from [here](http://home.uchicago.edu/rhudson1/source/mksamples.html "ms").
 
 ### Tip Simulations
 
@@ -12,9 +12,7 @@ Files in `Holstein_Demog` contain code for calculating mean tip lengths for Hols
 
 ### Data analyses
 
-This folder contains the files used to analyse the raw SDS scores.
-
-The SDS data files (both SDS scores and allele polarisation information) have to be first downloaded from [the Dryad depository](https://doi.org/10.5061/dryad.547d7wm8q "Dryad Deopsitory") and placed in the `HOL_Data_Analysis` folder.
+This folder contains the files used to analyse the raw SDS scores. The SDS data files (both SDS scores and allele polarisation information) have been archived on Dryad and are currently under curation (provisional DOI [https://doi.org/10.5061/dryad.547d7wm8q](https://doi.org/10.5061/dryad.547d7wm8q).
 
 `SDS_DataAnalysis.R` performs the data analyses. It can be run for the command line using `Rscript SDS_DataAnalysis.R Demog`. `Demog` is a switch indicating which demography to analyse (1 = high N0, 2 = low N0). You first have to change the `setwd` command on line 180 to point to the directory on your computer where the data files are stored. You also need to make `OutFigures` and `OutTables` folders in that directory to store outputs. You can also run the `SDS_DataAnalyses_Script.sh` script to execute both high- and low-N0 analyses simultaneously.
 
