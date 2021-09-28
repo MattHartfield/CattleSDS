@@ -345,21 +345,21 @@ dev.off()
 milkfv$Values$Bin <- factor(milkfv$Values$Bin,levels=unique(milkfv$Values$Bin))
 milkpv$Values$Bin <- factor(milkpv$Values$Bin,levels=unique(milkpv$Values$Bin))
 
-cat("Linear model test with all datapoints\n")
+cat("Spearman's rank test for milk traits, using all datapoints\n")
 milkf_lm <- lm(sSDS ~ p,data=milkfv$Value)
 milkp_lm <- lm(sSDS ~ p,data=milkpv$Value)
-summary(milkf_lm)
-summary(milkp_lm)
+cor.test(milkfv$Value$p,milkfv$Value$sSDS,method="spearman",exact=F)
+cor.test(milkpv$Value$p,milkpv$Value$sSDS,method="spearman",exact=F)
 
 # Removing points with outlier p-value and repeating
 milkfv2 <- subset(milkfv$Value,p<max(milkfv$Value$p))
 milkpv2 <- subset(milkpv$Value,p<max(milkpv$Value$p))
 
-cat("Linear model test after removing high p-value\n")
+cat("Spearman's rank test for milk traits, after removing high p-value\n")
 milkf_lm2 <- lm(sSDS ~ p,data=milkfv2)
 milkp_lm2 <- lm(sSDS ~ p,data=milkpv2)
-summary(milkf_lm2)
-summary(milkp_lm2)
+cor.test(milkfv2$p,milkfv2$sSDS,method="spearman",exact=F)
+cor.test(milkpv2$p,milkpv2$sSDS,method="spearman",exact=F)
 
 # Part 3: Reading in Stature QTL data. First where effect sizes estimated in 6 of 7 Holstein
 # These QTLs have positions relative to old assembly (UMD), the function transfers them to ARS-UCD assembly
@@ -392,10 +392,11 @@ hist(stat6res$Distances,main="Histogram of distances to nearest QTL\n(stature, 6
 hist(stat5res$Distances,main="Histogram of distances to nearest QTL\n(stature, 5 of 7 breeds)",xlab="Distance")
 dev.off()
 
+cat("Spearman's rank test for stature\n")
 stat6_lm <- lm(sSDS ~ p,data=stat6res$Value)
 stat5_lm <- lm(sSDS ~ p,data=stat5res$Value)
-summary(stat6_lm)
-summary(stat5_lm)
+cor.test(stat6res$Value$p,stat6res$Value$sSDS,method="spearman",exact=F)
+cor.test(stat5res$Value$p,stat5res$Value$sSDS,method="spearman",exact=F)
 
 # Plots of correlations between sSDS, QTL P-values
 # Seperate setups for high, low N0

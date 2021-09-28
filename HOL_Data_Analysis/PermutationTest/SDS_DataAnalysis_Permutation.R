@@ -32,7 +32,8 @@ QTLpol <- function(milkfQTL,SDSres2)
 	milkfQTL$pos <- as.numeric(milkfQTL$pos)
 
 	# Reading in table of allele polarisation
-	apol <- read.table(paste0("../SDSAll_Polarisation.dat"),header=T)
+#	apol <- read.table(paste0("../SDSAll_Polarisation.dat"),header=T)
+	apol <- read.table(paste0("SDSAll_Polarisation.dat"),header=T)
 	apol$CHROMOSOME = factor(apol$CHROMOSOME,levels=orderedChr)
 
 	# Finding nearest SNP to each QTL, obtaining SDS score
@@ -119,7 +120,8 @@ QTLspol <- function(statQTL6,SDSres2)
 	nQ <- dim(QTLi)[1];nQ
 	
 	# Reading in table of allele polarisation
-	apol <- read.table(paste0("../SDSAll_Polarisation.dat"),header=T)
+#	apol <- read.table(paste0("../SDSAll_Polarisation.dat"),header=T)
+	apol <- read.table(paste0("SDSAll_Polarisation.dat"),header=T)
 	apol$CHROMOSOME = factor(apol$CHROMOSOME,levels=orderedChr)
 	
 	# Finding nearest SNP to each QTL
@@ -185,10 +187,10 @@ library(tidyverse)
 theseed <- sample(2147483647-1,1)
 set.seed(theseed)
 cat("Seed is ", theseed, "\n",sep="")
-#setwd("/Users/hartfield/Documents/MilkSDS/HOL_Data_Analysis")
-setwd("/usr/home/qgg/mhart/MilkSDS_Dec18/PermutationTest")
-SDSres <- read.table(paste0("../SDSAll_",fname,"N0.dat"),header=T)
-#SDSres <- read.table(paste0("SDSAll_",fname,"N0.dat"),header=T)
+setwd("/Users/hartfield/Documents/MilkSDS/HOL_Data_Analysis")
+#setwd("/usr/home/qgg/mhart/MilkSDS_Dec18/PermutationTest")
+#SDSres <- read.table(paste0("../SDSAll_",fname,"N0.dat"),header=T)
+SDSres <- read.table(paste0("SDSAll_",fname,"N0.dat"),header=T)
 cno <- c(1:24,26:29)
 orderedChr=paste("Chr",cno, sep="")
 SDSres$CHROMOSOME = factor(SDSres$CHROMOSOME,levels=orderedChr)
@@ -260,8 +262,7 @@ if(idx == 1){
 	for(l in 1:length(list_dat))
 	{
 		tttab <- list_dat[[l]]
-		lmtt <- summary(lm(sSDS ~ p,data=tttab))
-		output_f2[l] <- lmtt$fstatistic[1]
+		output_f2[l] <- cor.test(tttab$p,tttab$sSDS,method="spearman",exact=F)$estimate
 	}
 	write.table(t(output_f2),file=paste0("OutTables/PermTest_n",idx,"_",fname,"N0.dat"), quote = F, row.names = F, col.names = F)
 }
@@ -284,8 +285,7 @@ for(l in 1:length(list_dat))
 		permSDS[k,1] <- sdsk
 	}
 	permSDS[,2] <- ttab$p
-	lmt <- summary(lm(sSDS ~ p,data=permSDS))
-	output_f[l] <- lmt$fstatistic[1]
+	output_f[l] <- cor.test(permSDS$p,permSDS$sSDS,method="spearman",exact=F)$estimate
 }
 
 if(idx == 1)
