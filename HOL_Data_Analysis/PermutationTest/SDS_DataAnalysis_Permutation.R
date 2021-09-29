@@ -32,8 +32,7 @@ QTLpol <- function(milkfQTL,SDSres2)
 	milkfQTL$pos <- as.numeric(milkfQTL$pos)
 
 	# Reading in table of allele polarisation
-#	apol <- read.table(paste0("../SDSAll_Polarisation.dat"),header=T)
-	apol <- read.table(paste0("SDSAll_Polarisation.dat"),header=T)
+	apol <- read.table(paste0("../SDSAll_Polarisation.dat"),header=T)
 	apol$CHROMOSOME = factor(apol$CHROMOSOME,levels=orderedChr)
 
 	# Finding nearest SNP to each QTL, obtaining SDS score
@@ -120,8 +119,7 @@ QTLspol <- function(statQTL6,SDSres2)
 	nQ <- dim(QTLi)[1];nQ
 	
 	# Reading in table of allele polarisation
-#	apol <- read.table(paste0("../SDSAll_Polarisation.dat"),header=T)
-	apol <- read.table(paste0("SDSAll_Polarisation.dat"),header=T)
+	apol <- read.table(paste0("../SDSAll_Polarisation.dat"),header=T)
 	apol$CHROMOSOME = factor(apol$CHROMOSOME,levels=orderedChr)
 	
 	# Finding nearest SNP to each QTL
@@ -187,10 +185,8 @@ library(tidyverse)
 theseed <- sample(2147483647-1,1)
 set.seed(theseed)
 cat("Seed is ", theseed, "\n",sep="")
-setwd("/Users/hartfield/Documents/MilkSDS/HOL_Data_Analysis")
-#setwd("/usr/home/qgg/mhart/MilkSDS_Dec18/PermutationTest")
-#SDSres <- read.table(paste0("../SDSAll_",fname,"N0.dat"),header=T)
-SDSres <- read.table(paste0("SDSAll_",fname,"N0.dat"),header=T)
+setwd("/usr/home/qgg/mhart/MilkSDS_Dec18/PermutationTest")
+SDSres <- read.table(paste0("../SDSAll_",fname,"N0.dat"),header=T)
 cno <- c(1:24,26:29)
 orderedChr=paste("Chr",cno, sep="")
 SDSres$CHROMOSOME = factor(SDSres$CHROMOSOME,levels=orderedChr)
@@ -246,6 +242,10 @@ milkpQTL <- readRDS("MilkQTL/qtls_tbl_prot_curated.rds")
 milkpQTL <- filter(milkpQTL,German_Holstein==French_Holstein) %>% filter(chr!=25) %>% filter(`ARS-UCD2.1`!="deleted")		# Filtering out those with conflicting effect sizes; those on Chr 25; where not present in ARS background
 milkpv <- QTLpol(milkpQTL,SDSres2)
 
+# Subsets with outlier point removed
+milkfv2 <- subset(milkfv$Value,p<max(milkfv$Value$p))
+milkpv2 <- subset(milkpv$Value,p<max(milkpv$Value$p))
+
 # Part 3: Reading in Stature QTL data. First where effect sizes estimated in 6 of 7 Holstein
 # These QTLs have positions relative to old assembly (UMD), the function transfers them to ARS-UCD assembly
 statQTL6 <- readRDS("QTLStatureDat/curated_stature_snps_6_2020.rds")
@@ -256,7 +256,7 @@ statQTL5 <- readRDS("QTLStatureDat/curated_stature_snps_5_2020.rds")
 stat5res <- QTLspol(statQTL5,SDSres2)
 
 # Permutation test code
-list_dat <- list(milkfv$Values, milkpv$Values, stat6res$Values, stat5res$Values)
+list_dat <- list(milkfv$Values, milkpv$Values, milkfv2, milkpv2, stat6res$Values, stat5res$Values)
 if(idx == 1){
 	output_f2 <- vector(mode="numeric",length=length(list_dat))
 	for(l in 1:length(list_dat))
