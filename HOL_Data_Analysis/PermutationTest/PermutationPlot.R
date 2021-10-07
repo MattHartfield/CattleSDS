@@ -15,8 +15,6 @@ datL <- read_table2("CompiledRes/HOL_Permutation_LowN0.dat")
 
 # Matrix of actual rho values
 actpv <- rbind(datH[1,],datL[1,])
-#row.names(actpv) <- cbind("HighN0","LowN0")
-#actpv <- data.frame(MilkFatR=c(0.5847,0.3616),MilkProtR=c(0.5716,0.1405),Stat6R=c(0.28,0.4408),Stat5R=c(0.04794,0.08695))
 
 # Combining permutations into one table
 datH <- as_tibble(cbind("HighN0",datH[2:1001,]))
